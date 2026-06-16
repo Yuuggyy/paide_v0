@@ -2,10 +2,11 @@ import { useState } from 'react';
 import { signIn } from '../../lib/supabaseClient';
 
 export default function LoginPage({ onLogin }) {
-  const [email, setEmail] = useState('');
+  const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [loading, setLoading]   = useState(false);
+  const [error, setError]       = useState('');
+  const [showPwd, setShowPwd]   = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -13,7 +14,7 @@ export default function LoginPage({ onLogin }) {
     setError('');
     const { data, error } = await signIn(email, password);
     if (error) {
-      setError('Email ou mot de passe incorrect.');
+      setError('Identifiants incorrects. Vérifiez votre email et mot de passe.');
       setLoading(false);
     } else {
       onLogin(data.user);
@@ -21,83 +22,122 @@ export default function LoginPage({ onLogin }) {
   };
 
   return (
-    <div style={styles.wrapper}>
-      {/* Left panel */}
-      <div style={styles.left}>
-        <div style={styles.leftContent}>
-          <div style={styles.logoCircle}>
-            <span style={styles.logoLetter}>P</span>
+    <div style={s.root}>
+      {/* ── LEFT PANEL ── */}
+      <div style={s.left}>
+        {/* Background shapes */}
+        <div style={s.shape1} />
+        <div style={s.shape2} />
+        <div style={s.shape3} />
+
+        <div style={s.leftContent}>
+          {/* Logo */}
+          <div style={s.logo}>
+            <span style={s.logoText}>P</span>
           </div>
-          <h1 style={styles.brand}>PAIDE</h1>
-          <p style={styles.brandSub}>Plateforme Administrative<br />Intégrée de Développement</p>
-          <div style={styles.features}>
-            {['Gestion des Centres', 'Suivi des Agents', 'Coordinations Provinciales', 'Rapports & Statistiques'].map((f, i) => (
-              <div key={i} style={styles.featureItem}>
-                <span style={styles.featureDot}></span>
-                <span>{f}</span>
+
+          <h1 style={s.brandName}>PAIDE</h1>
+          <p style={s.brandTagline}>Plateforme Administrative<br/>Intégrée de Développement</p>
+
+          <div style={s.divider} />
+
+          <div style={s.featureList}>
+            {[
+              { icon: '🏛️', label: 'Gestion des Centres' },
+              { icon: '👥', label: 'Suivi des Agents' },
+              { icon: '🗂️', label: 'Coordinations Provinciales' },
+              { icon: '📊', label: 'Rapports & Statistiques' },
+              { icon: '📅', label: 'Calendrier des Activités' },
+            ].map((f, i) => (
+              <div key={i} style={s.feature}>
+                <div style={s.featureIcon}>{f.icon}</div>
+                <span style={s.featureLabel}>{f.label}</span>
               </div>
             ))}
           </div>
         </div>
-        <div style={styles.wave}></div>
+
+        {/* Version badge */}
+        <div style={s.versionBadge}>PAIDE V0 · Beta</div>
       </div>
 
-      {/* Right panel */}
-      <div style={styles.right}>
-        <div style={styles.formBox}>
-          <div style={styles.formHeader}>
-            <h2 style={styles.formTitle}>Connexion</h2>
-            <p style={styles.formSub}>Accédez à votre espace PAIDE</p>
+      {/* ── RIGHT PANEL ── */}
+      <div style={s.right}>
+        <div style={s.formCard}>
+          {/* Header */}
+          <div style={s.formTop}>
+            <div style={s.formIcon}>👋</div>
+            <h2 style={s.formTitle}>Bon retour !</h2>
+            <p style={s.formSub}>Connectez-vous à votre espace PAIDE</p>
           </div>
 
-          <form onSubmit={handleSubmit} style={styles.form}>
-            <div style={styles.fieldGroup}>
-              <label style={styles.label}>Adresse email</label>
-              <div style={styles.inputWrap}>
-                <span style={styles.inputIcon}>✉️</span>
+          {/* Form */}
+          <form onSubmit={handleSubmit} style={s.form}>
+            {/* Email */}
+            <div style={s.field}>
+              <label style={s.label}>Adresse email</label>
+              <div style={s.inputBox}>
+                <span style={s.inputPrefix}>✉️</span>
                 <input
                   type="email"
                   value={email}
                   onChange={e => setEmail(e.target.value)}
-                  placeholder="votre@email.com"
+                  placeholder="vous@exemple.com"
                   required
-                  style={styles.input}
+                  style={s.input}
+                  autoComplete="email"
                 />
               </div>
             </div>
 
-            <div style={styles.fieldGroup}>
-              <label style={styles.label}>Mot de passe</label>
-              <div style={styles.inputWrap}>
-                <span style={styles.inputIcon}>🔒</span>
+            {/* Password */}
+            <div style={s.field}>
+              <label style={s.label}>Mot de passe</label>
+              <div style={s.inputBox}>
+                <span style={s.inputPrefix}>🔒</span>
                 <input
-                  type="password"
+                  type={showPwd ? 'text' : 'password'}
                   value={password}
                   onChange={e => setPassword(e.target.value)}
                   placeholder="••••••••"
                   required
-                  style={styles.input}
+                  style={s.input}
+                  autoComplete="current-password"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPwd(!showPwd)}
+                  style={s.eyeBtn}
+                >
+                  {showPwd ? '🙈' : '👁️'}
+                </button>
               </div>
             </div>
 
+            {/* Error */}
             {error && (
-              <div style={styles.errorBox}>
-                ⚠️ {error}
+              <div style={s.errorBox}>
+                <span>⚠️</span>
+                <span>{error}</span>
               </div>
             )}
 
-            <button type="submit" disabled={loading} style={styles.submitBtn}>
+            {/* Submit */}
+            <button type="submit" disabled={loading} style={s.submitBtn}>
               {loading ? (
-                <span style={styles.loader}></span>
+                <>
+                  <span style={s.spinner} />
+                  Connexion en cours…
+                </>
               ) : (
-                <>Se connecter <span>→</span></>
+                <>Se connecter <span style={s.arrow}>→</span></>
               )}
             </button>
           </form>
 
-          <p style={styles.footer}>
-            PAIDE © {new Date().getFullYear()} — Tous droits réservés
+          {/* Footer */}
+          <p style={s.formFooter}>
+            PAIDE © {new Date().getFullYear()} — Accès réservé au personnel autorisé
           </p>
         </div>
       </div>
@@ -105,92 +145,202 @@ export default function LoginPage({ onLogin }) {
   );
 }
 
-const styles = {
-  wrapper: {
+/* ── STYLES ── */
+const s = {
+  root: {
     display: 'flex',
     minHeight: '100vh',
     fontFamily: "'Inter', sans-serif",
+    background: '#eef2ff',
   },
+
+  /* Left */
   left: {
     flex: 1,
-    background: 'linear-gradient(145deg, #0f2a4a 0%, #1e4976 50%, #2563eb 100%)',
+    background: 'linear-gradient(145deg, #1e3a8a 0%, #1d4ed8 55%, #2563eb 100%)',
+    padding: '48px 56px',
     display: 'flex',
     flexDirection: 'column',
     justifyContent: 'center',
-    padding: '60px',
     position: 'relative',
     overflow: 'hidden',
   },
-  leftContent: { position: 'relative', zIndex: 2 },
-  logoCircle: {
+  shape1: {
+    position: 'absolute', width: '400px', height: '400px',
+    borderRadius: '50%',
+    background: 'rgba(255,255,255,0.04)',
+    top: '-100px', right: '-100px',
+    pointerEvents: 'none',
+  },
+  shape2: {
+    position: 'absolute', width: '250px', height: '250px',
+    borderRadius: '50%',
+    background: 'rgba(249,115,22,0.08)',
+    bottom: '60px', left: '-60px',
+    pointerEvents: 'none',
+  },
+  shape3: {
+    position: 'absolute', width: '180px', height: '180px',
+    borderRadius: '50%',
+    background: 'rgba(34,197,94,0.06)',
+    top: '40%', right: '5%',
+    pointerEvents: 'none',
+  },
+  leftContent: { position: 'relative', zIndex: 1 },
+
+  logo: {
     width: '72px', height: '72px',
     borderRadius: '20px',
-    background: 'rgba(255,255,255,0.15)',
-    backdropFilter: 'blur(10px)',
-    border: '2px solid rgba(255,255,255,0.2)',
+    background: 'rgba(255,255,255,0.12)',
+    backdropFilter: 'blur(12px)',
+    border: '1.5px solid rgba(255,255,255,0.2)',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    marginBottom: '20px',
+    marginBottom: '24px',
+    boxShadow: '0 8px 32px rgba(0,0,0,0.15)',
   },
-  logoLetter: { fontSize: '36px', fontWeight: '800', color: '#fff' },
-  brand: { fontSize: '42px', fontWeight: '800', color: '#fff', letterSpacing: '-1px', marginBottom: '8px' },
-  brandSub: { fontSize: '16px', color: 'rgba(255,255,255,0.7)', lineHeight: '1.6', marginBottom: '48px' },
-  features: { display: 'flex', flexDirection: 'column', gap: '16px' },
-  featureItem: { display: 'flex', alignItems: 'center', gap: '12px', color: 'rgba(255,255,255,0.85)', fontSize: '15px' },
-  featureDot: { width: '8px', height: '8px', borderRadius: '50%', background: '#f97316', flexShrink: 0 },
-  wave: {
-    position: 'absolute', right: '-80px', top: '50%', transform: 'translateY(-50%)',
-    width: '200px', height: '200px', borderRadius: '50%',
-    background: 'rgba(255,255,255,0.04)', zIndex: 1,
+  logoText: { fontSize: '36px', fontWeight: '900', color: '#fff', lineHeight: 1 },
+
+  brandName: {
+    fontSize: '52px', fontWeight: '900',
+    color: '#fff', letterSpacing: '-2px',
+    lineHeight: 1, marginBottom: '10px',
   },
+  brandTagline: {
+    fontSize: '16px', color: 'rgba(255,255,255,0.65)',
+    lineHeight: 1.7, marginBottom: '36px',
+  },
+  divider: {
+    width: '48px', height: '3px',
+    background: 'linear-gradient(90deg, #f97316, #fb923c)',
+    borderRadius: '2px', marginBottom: '32px',
+  },
+  featureList: { display: 'flex', flexDirection: 'column', gap: '14px' },
+  feature: { display: 'flex', alignItems: 'center', gap: '14px' },
+  featureIcon: {
+    width: '38px', height: '38px',
+    borderRadius: '10px',
+    background: 'rgba(255,255,255,0.1)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    fontSize: '17px', flexShrink: 0,
+  },
+  featureLabel: { fontSize: '15px', color: 'rgba(255,255,255,0.82)', fontWeight: '500' },
+
+  versionBadge: {
+    position: 'absolute', bottom: '28px', left: '56px',
+    fontSize: '11px', color: 'rgba(255,255,255,0.35)',
+    fontWeight: '600', letterSpacing: '1px',
+    textTransform: 'uppercase',
+  },
+
+  /* Right */
   right: {
-    width: '480px',
+    width: '500px',
+    flexShrink: 0,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    background: '#f0f4f8',
-    padding: '40px',
+    padding: '40px 32px',
+    background: '#eef2ff',
   },
-  formBox: {
+  formCard: {
     background: '#fff',
     borderRadius: '24px',
-    padding: '48px 40px',
+    padding: '48px 44px',
     width: '100%',
-    boxShadow: '0 10px 40px rgba(0,0,0,0.1)',
+    boxShadow: '0 20px 60px rgba(15,23,42,0.1), 0 4px 16px rgba(15,23,42,0.05)',
+    border: '1px solid rgba(226,232,240,0.8)',
   },
-  formHeader: { marginBottom: '32px' },
-  formTitle: { fontSize: '28px', fontWeight: '700', color: '#0f2a4a', marginBottom: '6px' },
-  formSub: { fontSize: '14px', color: '#6b7280' },
-  form: { display: 'flex', flexDirection: 'column', gap: '20px' },
-  fieldGroup: { display: 'flex', flexDirection: 'column', gap: '6px' },
+
+  formTop: { marginBottom: '36px' },
+  formIcon: {
+    fontSize: '36px', marginBottom: '14px',
+    display: 'block',
+  },
+  formTitle: {
+    fontSize: '28px', fontWeight: '800',
+    color: '#0f172a', letterSpacing: '-0.5px',
+    marginBottom: '6px',
+  },
+  formSub: { fontSize: '14px', color: '#64748b' },
+
+  form: { display: 'flex', flexDirection: 'column', gap: '18px' },
+
+  field: { display: 'flex', flexDirection: 'column', gap: '7px' },
   label: { fontSize: '13px', fontWeight: '600', color: '#374151' },
-  inputWrap: { display: 'flex', alignItems: 'center', background: '#f9fafb', border: '1.5px solid #e5e7eb', borderRadius: '10px', overflow: 'hidden', transition: 'border-color 0.2s' },
-  inputIcon: { padding: '0 14px', fontSize: '16px' },
+
+  inputBox: {
+    display: 'flex', alignItems: 'center',
+    border: '1.5px solid #e2e8f0',
+    borderRadius: '10px',
+    background: '#f8fafc',
+    overflow: 'hidden',
+    transition: 'border-color 0.2s, box-shadow 0.2s',
+  },
+  inputPrefix: {
+    padding: '0 14px',
+    fontSize: '16px',
+    lineHeight: 1,
+    flexShrink: 0,
+  },
   input: {
-    flex: 1, padding: '12px 14px 12px 0',
-    border: 'none', background: 'transparent',
-    fontSize: '14px', color: '#111827',
+    flex: 1,
+    padding: '13px 0',
+    border: 'none',
+    background: 'transparent',
+    fontSize: '14px',
+    color: '#0f172a',
     fontFamily: "'Inter', sans-serif",
   },
-  errorBox: {
-    background: '#fef2f2', border: '1px solid #fecaca',
-    color: '#dc2626', padding: '10px 14px',
-    borderRadius: '8px', fontSize: '13px',
+  eyeBtn: {
+    padding: '0 14px',
+    background: 'none',
+    border: 'none',
+    fontSize: '16px',
+    cursor: 'pointer',
+    opacity: 0.6,
+    flexShrink: 0,
   },
+
+  errorBox: {
+    display: 'flex', alignItems: 'flex-start', gap: '8px',
+    background: '#fef2f2',
+    border: '1px solid #fecaca',
+    borderRadius: '10px',
+    padding: '12px 14px',
+    fontSize: '13.5px',
+    color: '#dc2626',
+    fontWeight: '500',
+  },
+
   submitBtn: {
-    background: 'linear-gradient(135deg, #2563eb, #1e4976)',
-    color: '#fff', border: 'none',
-    padding: '14px', borderRadius: '10px',
-    fontSize: '15px', fontWeight: '700',
-    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-    boxShadow: '0 4px 16px rgba(37,99,235,0.35)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    gap: '8px',
+    background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+    color: '#fff',
+    border: 'none',
+    borderRadius: '12px',
+    padding: '15px',
+    fontSize: '15px',
+    fontWeight: '700',
+    cursor: 'pointer',
+    boxShadow: '0 4px 20px rgba(29,78,216,0.35)',
+    transition: 'all 0.2s ease',
     marginTop: '4px',
   },
-  loader: {
-    width: '20px', height: '20px',
+  arrow: { fontSize: '18px' },
+  spinner: {
+    width: '18px', height: '18px',
     border: '2px solid rgba(255,255,255,0.3)',
-    borderTop: '2px solid #fff',
+    borderTopColor: '#fff',
     borderRadius: '50%',
-    animation: 'spin 0.8s linear infinite',
+    animation: 'spin 0.7s linear infinite',
   },
-  footer: { textAlign: 'center', fontSize: '12px', color: '#9ca3af', marginTop: '24px' },
+
+  formFooter: {
+    textAlign: 'center',
+    fontSize: '12px',
+    color: '#94a3b8',
+    marginTop: '28px',
+    lineHeight: 1.6,
+  },
 };
