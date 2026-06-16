@@ -8,6 +8,8 @@ import FilieresPage from './pages/FilieresPage';
 import CalendrierPage from './pages/CalendrierPage';
 import RapportsPage from './pages/RapportsPage';
 import ParametresPage from './pages/ParametresPage';
+import CoordinationPage from './pages/CoordinationPage';
+import SousCoordinationPage from './pages/SousCoordinationPage';
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -16,7 +18,6 @@ export default function App() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check session on mount
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
         setUser(session.user);
@@ -26,7 +27,6 @@ export default function App() {
       }
     });
 
-    // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) {
         setUser(session.user);
@@ -44,6 +44,9 @@ export default function App() {
   const loadProfile = async (userId) => {
     const { data } = await getUserProfile(userId);
     setProfile(data);
+    // Rediriger selon le rôle
+    if (data?.role === 'centre') setCurrentPage('agents');
+    else if (data?.role === 'coordination' || data?.role === 'sous_coordination') setCurrentPage('centres');
     setLoading(false);
   };
 
@@ -63,19 +66,19 @@ export default function App() {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f8fafc', fontFamily: "'Segoe UI', sans-serif" }}>
         <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: '48px', marginBottom: '16px' }}>P</div>
+          <div style={{ fontSize: '48px', fontWeight: '700', color: '#1a3a5c', marginBottom: '16px' }}>P</div>
           <p style={{ color: '#6c757d', fontSize: '16px' }}>Chargement de PAIDE...</p>
         </div>
       </div>
     );
   }
 
-  if (!user) {
-    return <LoginPage onLogin={handleLogin} />;
-  }
+  if (!user) return <LoginPage onLogin={handleLogin} />;
 
   const pages = {
     centres: <CentresPage profile={profile} />,
+    coordination: <CoordinationPage profile={profile} />,
+    sous_coordination: <SousCoordinationPage profile={profile} />,
     agents: <AgentsPage profile={profile} />,
     filieres: <FilieresPage profile={profile} />,
     calendrier: <CalendrierPage profile={profile} />,
@@ -92,7 +95,6 @@ export default function App() {
         profile={profile}
         onLogout={handleLogout}
       />
-      {/* Main content - offset by sidebar width */}
       <main style={{ flex: 1, marginLeft: '240px', minHeight: '100vh', overflowY: 'auto' }}>
         {pages[currentPage] || pages.centres}
       </main>
