@@ -1,0 +1,8 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f8fafc; color: #374151; }
+input:focus, select:focus, textarea:focus { outline: none; border-color: #1a3a5c !important; box-shadow: 0 0 0 3px rgba(26,58,92,0.1); }
+button:hover { opacity: 0.9; }
+a { text-decoration: none; }
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: #f1f5f9; }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
