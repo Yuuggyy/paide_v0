@@ -1,0 +1,36 @@
+{
+  "name": "PAIDE Manager",
+  "short_name": "PAIDE",
+  "description": "Programme d'Appui aux Initiatives de Développement de l'Enfant",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0d1b2a",
+  "theme_color": "#008fb5",
+  "scope": "/",
+  "lang": "fr",
+  "icons": [
+    {
+      "src": "/logo_paide.jpg",
+      "sizes": "192x192",
+      "type": "image/jpeg",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/logo_paide.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["education", "productivity"],
+  "shortcuts": [
+    {
+      "name": "Centres",
+      "short_name": "Centres",
+      "description": "Gérer les centres PAIDE",
+      "url": "/",
+      "icons": [{ "src": "/logo_paide.jpg", "sizes": "96x96" }]
+    }
+  ]
+}
