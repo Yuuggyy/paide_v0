@@ -16,13 +16,6 @@ export default function App() {
   const [profile, setProfile]         = useState(null);
   const [currentPage, setCurrentPage] = useState('centres');
   const [loading, setLoading]         = useState(true);
-  const [isMobile, setIsMobile]       = useState(window.innerWidth < 768);
-
-  useEffect(() => {
-    const handle = () => setIsMobile(window.innerWidth < 768);
-    window.addEventListener('resize', handle);
-    return () => window.removeEventListener('resize', handle);
-  }, []);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -51,12 +44,17 @@ export default function App() {
   };
 
   if (loading) return (
-    <div style={ls.splash}>
-      <div style={ls.splashLogo}>P</div>
-      <div style={ls.splashBar}>
-        <div style={ls.splashFill} />
+    <div style={{
+      minHeight:'100vh', display:'flex', flexDirection:'column',
+      alignItems:'center', justifyContent:'center',
+      background:'linear-gradient(135deg, #005f7a 0%, #008fb5 100%)',
+      gap:24, fontFamily:"'Inter',sans-serif",
+    }}>
+      <div style={{ width:80, height:80, background:'#fff', borderRadius:20, padding:8, boxShadow:'0 8px 32px rgba(0,0,0,0.2)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+        <img src="/logo_paide.jpg" alt="PAIDE" style={{ width:'100%', objectFit:'contain' }} />
       </div>
-      <p style={ls.splashText}>Chargement de PAIDE…</p>
+      <div className="spinner" style={{ width:32, height:32 }} />
+      <p style={{ color:'rgba(255,255,255,0.6)', fontSize:13, fontWeight:500 }}>Chargement de PAIDE…</p>
     </div>
   );
 
@@ -74,7 +72,7 @@ export default function App() {
   };
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: '#eef2ff' }}>
+    <div className="app-shell">
       <Sidebar
         currentPage={currentPage}
         onNavigate={setCurrentPage}
@@ -82,48 +80,9 @@ export default function App() {
         profile={profile}
         onLogout={handleLogout}
       />
-      <main style={{
-        flex: 1,
-        marginLeft: isMobile ? 0 : undefined,
-        marginTop: isMobile ? '56px' : 0,
-        minHeight: '100vh',
-        overflowY: 'auto',
-        fontFamily: "'Inter', sans-serif",
-      }}>
+      <main className="main-content">
         {pages[currentPage] || pages.centres}
       </main>
     </div>
   );
 }
-
-const ls = {
-  splash: {
-    minHeight: '100vh',
-    display: 'flex', flexDirection: 'column',
-    alignItems: 'center', justifyContent: 'center',
-    background: 'linear-gradient(135deg, #1e3a8a, #1d4ed8)',
-    gap: '24px',
-    fontFamily: "'Inter', sans-serif",
-  },
-  splashLogo: {
-    fontSize: '64px', fontWeight: '900', color: '#fff',
-    width: '96px', height: '96px',
-    background: 'rgba(255,255,255,0.12)',
-    borderRadius: '24px',
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
-    lineHeight: 1,
-  },
-  splashBar: {
-    width: '120px', height: '3px',
-    background: 'rgba(255,255,255,0.15)',
-    borderRadius: '2px', overflow: 'hidden',
-  },
-  splashFill: {
-    height: '100%', width: '60%',
-    background: 'linear-gradient(90deg, #f97316, #fb923c)',
-    borderRadius: '2px',
-    animation: 'pulse 1.2s ease-in-out infinite',
-  },
-  splashText: { color: 'rgba(255,255,255,0.55)', fontSize: '14px', fontWeight: '500' },
-};

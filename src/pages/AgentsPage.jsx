@@ -2,235 +2,247 @@ import { useState, useEffect } from 'react';
 import { getAgentsByCentre, getCentres, createAgent, updateAgent, deleteAgent } from '../lib/api';
 import AgentFicheModal from '../components/agent/AgentFicheModal';
 
+const EMPTY = {
+  noms:'', sexe:'Masculin', email:'', adresse_electronique:'',
+  matricule:'', grade:'', fonction:'', salaire:'', prime:'',
+  date_embauche:'', type_piece_identite:'', numero_piece_identite:'', status:'actif',
+};
+
+function Field({ label, value, onChange, type='text', required, children }) {
+  return (
+    <div className="form-field">
+      <label className="form-label">{label}</label>
+      {children || <input type={type} value={value||''} onChange={e=>onChange(e.target.value)} required={required} />}
+    </div>
+  );
+}
+
 export default function AgentsPage({ profile }) {
-  const [agents, setAgents] = useState([]);
-  const [centres, setCentres] = useState([]);
-  const [selectedCentre, setSelectedCentre] = useState(profile?.centre_id || '');
-  const [loading, setLoading] = useState(false);
-  const [showForm, setShowForm] = useState(false);
-  const [editing, setEditing] = useState(null);
+  const [agents, setAgents]         = useState([]);
+  const [centres, setCentres]       = useState([]);
+  const [selCentre, setSelCentre]   = useState(profile?.centre_id || '');
+  const [loading, setLoading]       = useState(false);
+  const [showForm, setShowForm]     = useState(false);
+  const [editing, setEditing]       = useState(null);
   const [selectedAgent, setSelectedAgent] = useState(null);
-  const [error, setError] = useState('');
+  const [form, setForm]             = useState(EMPTY);
+  const [error, setError]           = useState('');
+  const [success, setSuccess]       = useState('');
 
   const isNational = profile?.role === 'national';
-  const isCentreAdmin = profile?.role === 'centre';
-
-  const emptyForm = {
-    noms: '', sexe: 'Masculin', email: '', adresse_electronique: '',
-    matricule: '', grade: '', fonction: '', salaire: '', prime: '',
-    date_embauche: '', type_piece_identite: '', numero_piece_identite: '',
-    status: 'actif', centre_id: selectedCentre
-  };
-  const [form, setForm] = useState(emptyForm);
 
   useEffect(() => {
-    if (isNational) getCentres().then(({data}) => setCentres(data || []));
-    if (selectedCentre) loadAgents(selectedCentre);
+    if (isNational) getCentres().then(({data}) => setCentres(data||[]));
+    if (selCentre) load(selCentre);
   }, []);
+  useEffect(() => { if (selCentre) load(selCentre); }, [selCentre]);
 
-  useEffect(() => {
-    if (selectedCentre) loadAgents(selectedCentre);
-  }, [selectedCentre]);
-
-  const loadAgents = async (centreId) => {
+  const load = async (cId) => {
     setLoading(true);
-    const { data } = await getAgentsByCentre(centreId);
-    setAgents(data || []);
+    const { data } = await getAgentsByCentre(cId);
+    setAgents(data||[]);
     setLoading(false);
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError('');
-    const payload = { ...form, centre_id: selectedCentre, salaire: parseFloat(form.salaire) || 0, prime: parseFloat(form.prime) || 0 };
-    if (editing) {
-      const { error } = await updateAgent(editing.id, payload);
-      if (error) return setError(error.message);
-    } else {
-      const { error } = await createAgent(payload);
-      if (error) return setError(error.message);
-    }
-    setShowForm(false);
-    setEditing(null);
-    setForm(emptyForm);
-    loadAgents(selectedCentre);
+  const sf = (k,v) => setForm(f=>({...f,[k]:v}));
+
+  const submit = async (e) => {
+    e.preventDefault(); setError(''); setSuccess('');
+    const payload = { ...form, centre_id: selCentre, salaire: parseFloat(form.salaire)||0, prime: parseFloat(form.prime)||0 };
+    const fn = editing ? updateAgent(editing.id, payload) : createAgent(payload);
+    const { error } = await fn;
+    if (error) return setError(error.message);
+    setSuccess(editing ? 'Agent mis à jour !' : 'Agent créé !');
+    setShowForm(false); setEditing(null); setForm(EMPTY);
+    load(selCentre);
   };
 
-  const handleEdit = (agent) => {
-    setEditing(agent);
-    setForm({ ...agent, salaire: agent.salaire?.toString() || '', prime: agent.prime?.toString() || '' });
-    setShowForm(true);
+  const handleEdit = (a) => {
+    setEditing(a);
+    setForm({ ...a, salaire: a.salaire?.toString()||'', prime: a.prime?.toString()||'' });
+    setShowForm(true); window.scrollTo({top:0, behavior:'smooth'});
   };
 
   const handleDelete = async (id) => {
     if (!window.confirm('Supprimer cet agent ?')) return;
-    await deleteAgent(id);
-    loadAgents(selectedCentre);
+    await deleteAgent(id); load(selCentre);
   };
 
+  const STATUS_BADGE = { actif:'badge-green', inactif:'badge-gray', suspendu:'badge-red' };
+
   return (
-    <div style={styles.container}>
-      <div style={styles.header}>
+    <div className="page-wrapper">
+      {/* Header */}
+      <div className="page-header">
         <div>
-          <h2 style={styles.title}>👥 Gestion des Agents</h2>
-          <p style={styles.subtitle}>{agents.length} agent(s)</p>
+          <h1 className="page-title">👥 Gestion des Agents</h1>
+          <p className="page-subtitle">{agents.length} agent(s) enregistré(s)</p>
         </div>
-        <button onClick={() => { setShowForm(true); setEditing(null); setForm(emptyForm); }} style={styles.btnPrimary}>
-          + Nouvel Agent
-        </button>
+        {selCentre && (
+          <button className="btn btn-teal" onClick={() => { setShowForm(true); setEditing(null); setForm(EMPTY); }}>
+            + Nouvel Agent
+          </button>
+        )}
       </div>
 
+      {/* Stats */}
+      <div className="stat-grid">
+        <div className="stat-card">
+          <div className="stat-icon stat-icon-teal">👥</div>
+          <div><div className="stat-value">{agents.length}</div><div className="stat-label">Total agents</div></div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-icon stat-icon-green">✅</div>
+          <div><div className="stat-value">{agents.filter(a=>a.status==='actif').length}</div><div className="stat-label">Actifs</div></div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-icon stat-icon-orange">⚠️</div>
+          <div><div className="stat-value">{agents.filter(a=>a.status!=='actif').length}</div><div className="stat-label">Inactifs/Suspendus</div></div>
+        </div>
+      </div>
+
+      {/* Alerts */}
+      {success && <div className="alert alert-success">✅ {success}</div>}
+      {error   && <div className="alert alert-error">⚠️ {error}</div>}
+
+      {/* Filtre centre */}
       {isNational && (
-        <div style={styles.filterBar}>
-          <label style={styles.label}>Sélectionner un Centre :</label>
-          <select value={selectedCentre} onChange={e => setSelectedCentre(e.target.value)} style={styles.select}>
-            <option value="">-- Choisir --</option>
+        <div className="filter-bar">
+          <label className="form-label" style={{whiteSpace:'nowrap'}}>🏛️ Centre :</label>
+          <select value={selCentre} onChange={e=>setSelCentre(e.target.value)} style={{maxWidth:320}}>
+            <option value="">-- Sélectionner un centre --</option>
             {centres.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
         </div>
       )}
 
+      {/* Formulaire */}
       {showForm && (
-        <div style={styles.formCard}>
-          <h3 style={styles.formTitle}>{editing ? 'Modifier Agent' : 'Nouvel Agent'}</h3>
-          <form onSubmit={handleSubmit}>
-            <div style={styles.section}>
-              <h4 style={styles.sectionTitle}>📋 Identification Personnelle</h4>
-              <div style={styles.grid3}>
-                <Field label="Noms complets" value={form.noms} onChange={v => setForm({...form, noms: v})} required />
-                <div>
-                  <label style={styles.label}>Sexe</label>
-                  <select value={form.sexe} onChange={e => setForm({...form, sexe: e.target.value})} style={styles.select}>
-                    <option>Masculin</option>
-                    <option>Féminin</option>
-                  </select>
-                </div>
-                <Field label="Adresse e-mail" value={form.email} type="email" onChange={v => setForm({...form, email: v})} />
-                <Field label="Adresse électronique / Physique" value={form.adresse_electronique} onChange={v => setForm({...form, adresse_electronique: v})} />
-              </div>
+        <div className="form-card">
+          <h3 style={{fontSize:17, fontWeight:700, marginBottom:4}}>{editing ? '✏️ Modifier l\'Agent' : '➕ Nouvel Agent'}</h3>
+          <p style={{fontSize:13, color:'var(--text-muted)', marginBottom:8}}>Remplissez les informations de l'agent.</p>
+          <form onSubmit={submit}>
+            <div className="form-section">📋 Identification Personnelle</div>
+            <div className="form-grid-3">
+              <Field label="Noms complets *" value={form.noms} onChange={v=>sf('noms',v)} required />
+              <Field label="Sexe">
+                <select value={form.sexe} onChange={e=>sf('sexe',e.target.value)}>
+                  <option>Masculin</option><option>Féminin</option>
+                </select>
+              </Field>
+              <Field label="Email" value={form.email} type="email" onChange={v=>sf('email',v)} />
+              <Field label="Adresse physique / électronique" value={form.adresse_electronique} onChange={v=>sf('adresse_electronique',v)} />
             </div>
 
-            <div style={styles.section}>
-              <h4 style={styles.sectionTitle}>🏢 Identification Administrative</h4>
-              <div style={styles.grid3}>
-                <Field label="Matricule" value={form.matricule} onChange={v => setForm({...form, matricule: v})} />
-                <Field label="Grade" value={form.grade} onChange={v => setForm({...form, grade: v})} />
-                <Field label="Fonction" value={form.fonction} onChange={v => setForm({...form, fonction: v})} />
-                <Field label="Salaire (USD)" value={form.salaire} type="number" onChange={v => setForm({...form, salaire: v})} />
-                <Field label="Prime (USD)" value={form.prime} type="number" onChange={v => setForm({...form, prime: v})} />
-                <Field label="Date d'embauche" value={form.date_embauche} type="date" onChange={v => setForm({...form, date_embauche: v})} />
-                <div>
-                  <label style={styles.label}>Type pièce d'identité</label>
-                  <select value={form.type_piece_identite} onChange={e => setForm({...form, type_piece_identite: e.target.value})} style={styles.select}>
-                    <option value="">-- Sélectionner --</option>
-                    <option>Carte Nationale d'Identité</option>
-                    <option>Passeport</option>
-                    <option>Permis de conduire</option>
-                    <option>Autre</option>
-                  </select>
-                </div>
-                <Field label="N° Pièce d'identité" value={form.numero_piece_identite} onChange={v => setForm({...form, numero_piece_identite: v})} />
-                <div>
-                  <label style={styles.label}>Statut</label>
-                  <select value={form.status} onChange={e => setForm({...form, status: e.target.value})} style={styles.select}>
-                    <option value="actif">Actif</option>
-                    <option value="inactif">Inactif</option>
-                    <option value="suspendu">Suspendu</option>
-                  </select>
-                </div>
-              </div>
+            <div className="form-section">🏢 Identification Administrative</div>
+            <div className="form-grid-3">
+              <Field label="Matricule" value={form.matricule} onChange={v=>sf('matricule',v)} />
+              <Field label="Grade" value={form.grade} onChange={v=>sf('grade',v)} />
+              <Field label="Fonction" value={form.fonction} onChange={v=>sf('fonction',v)} />
+              <Field label="Salaire (USD)" value={form.salaire} type="number" onChange={v=>sf('salaire',v)} />
+              <Field label="Prime (USD)" value={form.prime} type="number" onChange={v=>sf('prime',v)} />
+              <Field label="Date d'embauche" value={form.date_embauche} type="date" onChange={v=>sf('date_embauche',v)} />
+              <Field label="Type pièce d'identité">
+                <select value={form.type_piece_identite} onChange={e=>sf('type_piece_identite',e.target.value)}>
+                  <option value="">-- Sélectionner --</option>
+                  <option>Carte Nationale d'Identité</option>
+                  <option>Passeport</option><option>Permis de conduire</option><option>Autre</option>
+                </select>
+              </Field>
+              <Field label="N° Pièce d'identité" value={form.numero_piece_identite} onChange={v=>sf('numero_piece_identite',v)} />
+              <Field label="Statut">
+                <select value={form.status} onChange={e=>sf('status',e.target.value)}>
+                  <option value="actif">Actif</option>
+                  <option value="inactif">Inactif</option>
+                  <option value="suspendu">Suspendu</option>
+                </select>
+              </Field>
             </div>
 
-            {error && <div style={styles.error}>{error}</div>}
-            <div style={styles.formActions}>
-              <button type="button" onClick={() => { setShowForm(false); setEditing(null); }} style={styles.btnSecondary}>Annuler</button>
-              <button type="submit" style={styles.btnPrimary}>{editing ? 'Mettre à jour' : 'Créer'}</button>
+            <div className="form-actions">
+              <button type="button" className="btn btn-ghost" onClick={() => { setShowForm(false); setEditing(null); }}>Annuler</button>
+              <button type="submit" className="btn btn-teal">{editing ? 'Mettre à jour' : 'Créer l\'Agent'}</button>
             </div>
           </form>
         </div>
       )}
 
-      {loading ? (
-        <div style={styles.loading}>Chargement...</div>
-      ) : (
-        <div style={styles.table}>
-          <table style={styles.tableEl}>
-            <thead>
-              <tr>
-                {['Matricule','Noms','Sexe','Grade','Fonction','Salaire','Status','Actions'].map(h => (
-                  <th key={h} style={styles.th}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {agents.map(agent => (
-                <tr key={agent.id} style={styles.tr}>
-                  <td style={styles.td}><code>{agent.matricule}</code></td>
-                  <td style={styles.td}><b>{agent.noms}</b></td>
-                  <td style={styles.td}>{agent.sexe}</td>
-                  <td style={styles.td}>{agent.grade}</td>
-                  <td style={styles.td}>{agent.fonction}</td>
-                  <td style={styles.td}>${agent.salaire}</td>
-                  <td style={styles.td}>
-                    <span style={{...styles.badge, background: agent.status === 'actif' ? '#dcfce7' : '#fee2e2', color: agent.status === 'actif' ? '#166534' : '#dc2626'}}>
-                      {agent.status}
-                    </span>
-                  </td>
-                  <td style={styles.td}>
-                    <button onClick={() => setSelectedAgent(agent)} style={styles.btnIcon} title="Voir fiche">👁️</button>
-                    <button onClick={() => handleEdit(agent)} style={styles.btnIcon} title="Modifier">✏️</button>
-                    <button onClick={() => handleDelete(agent.id)} style={styles.btnIconDanger} title="Supprimer">🗑️</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {agents.length === 0 && <div style={styles.empty}>Aucun agent enregistré pour ce centre.</div>}
+      {/* Contenu */}
+      {!selCentre && isNational ? (
+        <div className="empty-state">
+          <div className="emoji">🏛️</div>
+          <h3>Sélectionnez un centre</h3>
+          <p>Choisissez un centre dans le filtre ci-dessus pour voir ses agents.</p>
         </div>
+      ) : loading ? (
+        <div className="loading-center"><div className="spinner" /><p>Chargement…</p></div>
+      ) : (
+        <>
+          {/* Desktop table */}
+          <div className="table-wrapper desktop-table">
+            <div className="table-scroll">
+              <table>
+                <thead>
+                  <tr>{['Matricule','Noms','Sexe','Grade','Fonction','Salaire','Statut','Actions'].map(h=>(
+                    <th key={h}>{h}</th>
+                  ))}</tr>
+                </thead>
+                <tbody>
+                  {agents.map(a => (
+                    <tr key={a.id}>
+                      <td><code style={{background:'var(--teal-ultra)',padding:'2px 7px',borderRadius:5,fontSize:12,color:'var(--teal-dark)'}}>{a.matricule||'—'}</code></td>
+                      <td style={{fontWeight:600,color:'var(--text-primary)'}}>{a.noms}</td>
+                      <td>{a.sexe}</td>
+                      <td>{a.grade||'—'}</td>
+                      <td>{a.fonction||'—'}</td>
+                      <td style={{fontWeight:600,color:'var(--green-dark)'}}>${a.salaire||0}</td>
+                      <td><span className={`badge ${STATUS_BADGE[a.status]||'badge-gray'}`}>{a.status}</span></td>
+                      <td>
+                        <div style={{display:'flex',gap:6}}>
+                          <button className="btn-icon" onClick={()=>setSelectedAgent(a)} title="Voir fiche">👁️</button>
+                          <button className="btn-icon" onClick={()=>handleEdit(a)} title="Modifier">✏️</button>
+                          <button className="btn-icon btn-icon-danger" onClick={()=>handleDelete(a.id)} title="Supprimer">🗑️</button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {agents.length===0 && <div className="empty-state"><div className="emoji">👥</div><h3>Aucun agent</h3><p>Aucun agent enregistré pour ce centre.</p></div>}
+            </div>
+          </div>
+
+          {/* Mobile cards */}
+          <div className="mobile-list">
+            {agents.length===0
+              ? <div className="empty-state"><div className="emoji">👥</div><h3>Aucun agent</h3><p>Ajoutez un premier agent.</p></div>
+              : agents.map(a => (
+                <div key={a.id} className="agent-card-mobile">
+                  <div className="agent-card-mobile-header">
+                    <div>
+                      <div style={{fontWeight:700,fontSize:15,color:'var(--text-primary)'}}>{a.noms}</div>
+                      <div style={{fontSize:12,color:'var(--text-muted)',marginTop:2}}>{a.fonction||'—'} · {a.grade||'—'}</div>
+                    </div>
+                    <span className={`badge ${STATUS_BADGE[a.status]||'badge-gray'}`}>{a.status}</span>
+                  </div>
+                  <div style={{display:'flex',flexWrap:'wrap',gap:8,fontSize:13,color:'var(--text-secondary)'}}>
+                    {a.matricule && <span>🪪 {a.matricule}</span>}
+                    {a.salaire   && <span>💵 ${a.salaire}</span>}
+                    {a.sexe      && <span>👤 {a.sexe}</span>}
+                  </div>
+                  <div className="agent-card-mobile-actions">
+                    <button className="btn btn-ghost" style={{flex:1,padding:'8px',fontSize:13}} onClick={()=>setSelectedAgent(a)}>👁️ Fiche</button>
+                    <button className="btn btn-teal" style={{flex:1,padding:'8px',fontSize:13}} onClick={()=>handleEdit(a)}>✏️ Modifier</button>
+                    <button className="btn btn-danger" style={{padding:'8px 12px',fontSize:13,borderRadius:8}} onClick={()=>handleDelete(a.id)}>🗑️</button>
+                  </div>
+                </div>
+              ))
+            }
+          </div>
+        </>
       )}
 
-      {selectedAgent && (
-        <AgentFicheModal agent={selectedAgent} onClose={() => setSelectedAgent(null)} />
-      )}
+      {selectedAgent && <AgentFicheModal agent={selectedAgent} onClose={()=>setSelectedAgent(null)} />}
     </div>
   );
 }
-
-function Field({ label, value, onChange, type = 'text', required }) {
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-      <label style={{ fontSize: '13px', fontWeight: '600', color: '#374151' }}>{label}</label>
-      <input type={type} value={value || ''} onChange={e => onChange(e.target.value)} required={required}
-        style={{ padding: '10px 12px', borderRadius: '8px', border: '1.5px solid #d1d5db', fontSize: '14px' }} />
-    </div>
-  );
-}
-
-const styles = {
-  container: { padding: '32px', fontFamily: "'Segoe UI', sans-serif" },
-  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' },
-  title: { fontSize: '24px', fontWeight: '700', color: '#1a3a5c', margin: 0 },
-  subtitle: { fontSize: '14px', color: '#6c757d', marginTop: '4px' },
-  filterBar: { display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px', background: '#f8fafc', padding: '12px 16px', borderRadius: '8px' },
-  label: { fontSize: '13px', fontWeight: '600', color: '#374151' },
-  select: { padding: '10px 12px', borderRadius: '8px', border: '1.5px solid #d1d5db', fontSize: '14px', minWidth: '200px' },
-  formCard: { background: '#fff', borderRadius: '12px', padding: '24px', marginBottom: '24px', border: '1px solid #e5e7eb', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' },
-  formTitle: { fontSize: '18px', fontWeight: '700', color: '#1a3a5c', marginBottom: '20px' },
-  section: { marginBottom: '24px' },
-  sectionTitle: { fontSize: '15px', fontWeight: '700', color: '#1a3a5c', marginBottom: '16px', paddingBottom: '8px', borderBottom: '2px solid #e5e7eb' },
-  grid3: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' },
-  formActions: { display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '16px' },
-  error: { background: '#fee2e2', color: '#dc2626', padding: '10px', borderRadius: '8px', fontSize: '13px', margin: '12px 0' },
-  loading: { textAlign: 'center', padding: '40px', color: '#6c757d' },
-  empty: { textAlign: 'center', padding: '40px', color: '#9ca3af', fontStyle: 'italic' },
-  table: { background: '#fff', borderRadius: '12px', border: '1px solid #e5e7eb', overflow: 'hidden' },
-  tableEl: { width: '100%', borderCollapse: 'collapse' },
-  th: { background: '#f8fafc', padding: '12px 16px', textAlign: 'left', fontSize: '13px', fontWeight: '700', color: '#374151', borderBottom: '1px solid #e5e7eb' },
-  tr: { borderBottom: '1px solid #f1f5f9', transition: 'background 0.1s' },
-  td: { padding: '12px 16px', fontSize: '14px', color: '#374151' },
-  badge: { padding: '3px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '600' },
-  btnPrimary: { background: '#1a3a5c', color: '#fff', border: 'none', padding: '10px 20px', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: '600' },
-  btnSecondary: { background: '#f1f5f9', color: '#374151', border: '1px solid #d1d5db', padding: '10px 20px', borderRadius: '8px', cursor: 'pointer', fontSize: '14px' },
-  btnIcon: { background: 'none', border: 'none', cursor: 'pointer', fontSize: '16px', padding: '4px', marginRight: '4px' },
-  btnIconDanger: { background: 'none', border: 'none', cursor: 'pointer', fontSize: '16px', padding: '4px' },
-};
