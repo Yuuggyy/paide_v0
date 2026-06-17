@@ -140,10 +140,6 @@ export default function AgentsPage({ profile }) {
 
   const openForm = () => {
     if (isNational && !effectiveCentre) { setError('Sélectionnez d\'abord un centre.'); return; }
-    setError(''); setShowForm(true); setEditing(null);
-  }
-    setError(''); setShowForm(true); setEditing(null); setForm(EMPTY); setPendingFiles([]);
-  }
     setError(''); setShowForm(true); setEditing(null); setForm(EMPTY); setPendingFiles([]);
   };
 
