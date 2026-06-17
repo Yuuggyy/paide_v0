@@ -11,6 +11,54 @@ import ParametresPage from './pages/ParametresPage';
 import CoordinationPage from './pages/CoordinationPage';
 import SousCoordinationPage from './pages/SousCoordinationPage';
 
+function Footer() {
+  return (
+    <footer style={{
+      width: '100%',
+      padding: '14px 24px',
+      background: '#f8fafc',
+      borderTop: '1px solid #e2e8f0',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      gap: 4,
+      marginTop: 'auto',
+    }}>
+      <p style={{
+        fontSize: 11,
+        color: '#94a3b8',
+        textAlign: 'center',
+        margin: 0,
+        fontFamily: "'Inter', sans-serif",
+      }}>
+        © {new Date().getFullYear()} PAIDE — Tous droits réservés
+      </p>
+      <p style={{
+        fontSize: 11,
+        color: '#94a3b8',
+        textAlign: 'center',
+        margin: 0,
+        fontFamily: "'Inter', sans-serif",
+      }}>
+        Conçu et développé par{' '}
+        <a
+          href="https://wa.me/243977555768"
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            color: '#008fb5',
+            fontWeight: 700,
+            textDecoration: 'none',
+            borderBottom: '1px solid #008fb5',
+          }}
+        >
+          Inspire by YuuStore
+        </a>
+      </p>
+    </footer>
+  );
+}
+
 export default function App() {
   const [user, setUser]               = useState(null);
   const [profile, setProfile]         = useState(null);
@@ -80,8 +128,11 @@ export default function App() {
         profile={profile}
         onLogout={handleLogout}
       />
-      <main className="main-content">
-        {pages[currentPage] || pages.centres}
+      <main className="main-content" style={{display:'flex', flexDirection:'column', minHeight:'100vh'}}>
+        <div style={{flex:1}}>
+          {pages[currentPage] || pages.centres}
+        </div>
+        <Footer />
       </main>
     </div>
   );
