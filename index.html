@@ -3,43 +3,19 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-
-    <title>PAIDE Manager</title>
-    <meta name="description" content="Programme d'Appui aux Initiatives de Développement de l'Enfant" />
     <meta name="theme-color" content="#008fb5" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="PAIDE" />
-
-    <!-- PWA manifest -->
-    <link rel="manifest" href="/manifest.json" />
-
-    <!-- Icône pour iOS (Apple touch icon) -->
+    <meta name="description" content="Programme d'Appui aux Initiatives de Développement de l'Enfant" />
+    <link rel="icon" type="image/jpeg" href="/logo_paide.jpg" />
     <link rel="apple-touch-icon" href="/logo_paide.jpg" />
-    <link rel="icon" href="/logo_paide.jpg" type="image/jpeg" />
-
-    <!-- Splash screen couleur PAIDE pour iOS -->
-    <meta name="msapplication-TileColor" content="#008fb5" />
-    <meta name="msapplication-TileImage" content="/logo_paide.jpg" />
-
-    <!-- Police Inter via Google Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="manifest" href="/manifest.json" />
+    <title>PAIDE Manager</title>
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
-
-    <!-- Enregistrement du Service Worker (PWA) -->
-    <script>
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js')
-            .then(reg => console.log('✅ SW PAIDE enregistré:', reg.scope))
-            .catch(err => console.log('❌ SW erreur:', err));
-        });
-      }
-    </script>
   </body>
 </html>
