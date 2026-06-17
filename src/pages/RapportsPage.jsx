@@ -24,12 +24,18 @@ export default function RapportsPage({ profile }) {
   });
 
   const isNational = profile?.role === 'national';
+  const isCentre   = profile?.role === 'centre';
+  const canManage  = isNational || isCentre;
+  const effectiveCentre = isCentre ? profile.centre_id : selCentre;
 
   useEffect(() => {
     if (isNational) getCentres().then(({data}) => setCentres(data||[]));
-    if (selCentre) { load(selCentre); loadAgents(selCentre); }
+    if (effectiveCentre) { load(effectiveCentre); loadAgents(effectiveCentre); }
   }, []);
-  useEffect(() => { if (selCentre) { load(selCentre); loadAgents(selCentre); } }, [selCentre]);
+
+  useEffect(() => {
+    if (isNational && selCentre) { load(selCentre); loadAgents(selCentre); }
+  }, [selCentre]);
 
   const load = async (cId) => {
     setLoading(true);
@@ -44,12 +50,12 @@ export default function RapportsPage({ profile }) {
 
   const submit = async (e) => {
     e.preventDefault(); setError(''); setSuccess('');
-    const { error } = await createRapport({ ...form, centre_id: selCentre });
+    const { error } = await createRapport({ ...form, centre_id: effectiveCentre });
     if (error) return setError(error.message);
     setSuccess('Renseignement enregistré !');
     setShowForm(false);
     setForm({ agent_id:'', type_rapport:'retard', description:'', date_rapport: new Date().toISOString().split('T')[0], severite:'moyen' });
-    load(selCentre);
+    load(effectiveCentre);
   };
 
   const sf = (k,v) => setForm(f=>({...f,[k]:v}));
@@ -61,19 +67,19 @@ export default function RapportsPage({ profile }) {
           <h1 className="page-title">📋 Renseignements</h1>
           <p className="page-subtitle">{rapports.length} renseignement(s) enregistré(s)</p>
         </div>
-        {selCentre && (
+        {/* Bouton visible pour national ET centre */}
+        {canManage && effectiveCentre && (
           <button className="btn btn-teal" onClick={() => { setShowForm(true); setForm({ agent_id:'', type_rapport:'retard', description:'', date_rapport: new Date().toISOString().split('T')[0], severite:'moyen' }); }}>
             + Nouveau Renseignement
           </button>
         )}
       </div>
 
-      {/* Stats */}
       <div className="stat-grid">
         {[
-          { label:'Total', val: rapports.length, icon:'📋', cls:'stat-icon-teal' },
-          { label:'Felicitations', val: rapports.filter(r=>r.type_rapport==='felicitation').length, icon:'🌟', cls:'stat-icon-green' },
-          { label:'Avertissements', val: rapports.filter(r=>['avertissement','suspension'].includes(r.type_rapport)).length, icon:'⚠️', cls:'stat-icon-orange' },
+          { label:'Total',        val: rapports.length, icon:'📋', cls:'stat-icon-teal' },
+          { label:'Félicitations',val: rapports.filter(r=>r.type_rapport==='felicitation').length, icon:'🌟', cls:'stat-icon-green' },
+          { label:'Avertissements',val: rapports.filter(r=>['avertissement','suspension'].includes(r.type_rapport)).length, icon:'⚠️', cls:'stat-icon-orange' },
         ].map(s => (
           <div key={s.label} className="stat-card">
             <div className={`stat-icon ${s.cls}`}>{s.icon}</div>
@@ -85,6 +91,7 @@ export default function RapportsPage({ profile }) {
       {success && <div className="alert alert-success">✅ {success}</div>}
       {error   && <div className="alert alert-error">⚠️ {error}</div>}
 
+      {/* Filtre centre — national uniquement */}
       {isNational && (
         <div className="filter-bar">
           <label className="form-label" style={{whiteSpace:'nowrap'}}>🏛️ Centre :</label>
@@ -95,7 +102,7 @@ export default function RapportsPage({ profile }) {
         </div>
       )}
 
-      {showForm && (
+      {showForm && canManage && (
         <div className="form-card">
           <h3 style={{fontSize:17,fontWeight:700,marginBottom:16}}>➕ Nouveau Renseignement</h3>
           <form onSubmit={submit}>
@@ -142,7 +149,7 @@ export default function RapportsPage({ profile }) {
         </div>
       )}
 
-      {!selCentre && isNational ? (
+      {!effectiveCentre && isNational ? (
         <div className="empty-state"><div className="emoji">🏛️</div><h3>Sélectionnez un centre</h3><p>Choisissez un centre pour voir ses renseignements.</p></div>
       ) : loading ? (
         <div className="loading-center"><div className="spinner" /><p>Chargement…</p></div>
@@ -155,9 +162,7 @@ export default function RapportsPage({ profile }) {
             return (
               <div key={r.id} className="card" style={{padding:16}}>
                 <div style={{display:'flex',alignItems:'flex-start',gap:12,flexWrap:'wrap'}}>
-                  <div style={{width:40,height:40,borderRadius:10,background:'var(--surface-alt)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:20,flexShrink:0}}>
-                    {ts.emoji}
-                  </div>
+                  <div style={{width:40,height:40,borderRadius:10,background:'var(--surface-alt)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:20,flexShrink:0}}>{ts.emoji}</div>
                   <div style={{flex:1,minWidth:0}}>
                     <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',marginBottom:4}}>
                       <span style={{fontWeight:700,fontSize:14,color:'var(--text-primary)'}}>{r.agents?.noms||'Agent inconnu'}</span>

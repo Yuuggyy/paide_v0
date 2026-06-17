@@ -2,191 +2,194 @@ import { useState, useEffect } from 'react';
 import { getCalendrierByCentre, createCours, updateCours, deleteCours, getCentres, getFilieresByCentre } from '../lib/api';
 
 const JOURS = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
+const EMPTY_FORM = { titre:'', instructeur:'', jour_semaine:'Lundi', heure_debut:'', heure_fin:'', salle:'', filiere_id:'' };
 
 export default function CalendrierPage({ profile }) {
-  const [cours, setCours] = useState([]);
-  const [centres, setCentres] = useState([]);
-  const [filieres, setFilieres] = useState([]);
-  const [selectedCentre, setSelectedCentre] = useState(profile?.centre_id || '');
-  const [showForm, setShowForm] = useState(false);
-  const [editing, setEditing] = useState(null);
-  const [form, setForm] = useState({ titre: '', instructeur: '', jour_semaine: 'Lundi', heure_debut: '', heure_fin: '', salle: '', filiere_id: '' });
+  const [cours, setCours]         = useState([]);
+  const [centres, setCentres]     = useState([]);
+  const [filieres, setFilieres]   = useState([]);
+  const [selCentre, setSelCentre] = useState(profile?.centre_id || '');
+  const [showForm, setShowForm]   = useState(false);
+  const [editing, setEditing]     = useState(null);
+  const [form, setForm]           = useState(EMPTY_FORM);
+  const [error, setError]         = useState('');
+  const [success, setSuccess]     = useState('');
 
   const isNational = profile?.role === 'national';
+  const isCentre   = profile?.role === 'centre';
+  const canManage  = isNational || isCentre;
+  const effectiveCentre = isCentre ? profile.centre_id : selCentre;
 
   useEffect(() => {
-    if (isNational) getCentres().then(({data}) => setCentres(data || []));
-    if (selectedCentre) { loadCours(selectedCentre); loadFilieres(selectedCentre); }
+    if (isNational) getCentres().then(({data}) => setCentres(data||[]));
+    if (effectiveCentre) { loadCours(effectiveCentre); loadFilieres(effectiveCentre); }
   }, []);
 
   useEffect(() => {
-    if (selectedCentre) { loadCours(selectedCentre); loadFilieres(selectedCentre); }
-  }, [selectedCentre]);
+    if (isNational && selCentre) { loadCours(selCentre); loadFilieres(selCentre); }
+  }, [selCentre]);
 
-  const loadCours = async (id) => {
-    const { data } = await getCalendrierByCentre(id);
-    setCours(data || []);
-  };
+  const loadCours    = async (id) => { const { data } = await getCalendrierByCentre(id); setCours(data||[]); };
+  const loadFilieres = async (id) => { const { data } = await getFilieresByCentre(id); setFilieres(data||[]); };
 
-  const loadFilieres = async (id) => {
-    const { data } = await getFilieresByCentre(id);
-    setFilieres(data || []);
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    const payload = { ...form, centre_id: selectedCentre };
-    if (editing) { await updateCours(editing.id, payload); }
-    else { await createCours(payload); }
-    setShowForm(false);
-    setEditing(null);
-    setForm({ titre: '', instructeur: '', jour_semaine: 'Lundi', heure_debut: '', heure_fin: '', salle: '', filiere_id: '' });
-    loadCours(selectedCentre);
+  const submit = async (e) => {
+    e.preventDefault(); setError(''); setSuccess('');
+    const payload = { ...form, centre_id: effectiveCentre };
+    const { error } = editing ? await updateCours(editing.id, payload) : await createCours(payload);
+    if (error) return setError(error.message);
+    setSuccess(editing ? 'Cours mis à jour !' : 'Cours ajouté !');
+    setShowForm(false); setEditing(null); setForm(EMPTY_FORM);
+    loadCours(effectiveCentre);
   };
 
   const handleEdit = (c) => {
     setEditing(c);
-    setForm({ titre: c.titre, instructeur: c.instructeur || '', jour_semaine: c.jour_semaine, heure_debut: c.heure_debut || '', heure_fin: c.heure_fin || '', salle: c.salle || '', filiere_id: c.filiere_id || '' });
+    setForm({ titre:c.titre, instructeur:c.instructeur||'', jour_semaine:c.jour_semaine, heure_debut:c.heure_debut||'', heure_fin:c.heure_fin||'', salle:c.salle||'', filiere_id:c.filiere_id||'' });
     setShowForm(true);
+    window.scrollTo({ top:0, behavior:'smooth' });
   };
 
   const handleDelete = async (id) => {
     if (!window.confirm('Supprimer ce cours ?')) return;
-    await deleteCours(id);
-    loadCours(selectedCentre);
+    await deleteCours(id); loadCours(effectiveCentre);
   };
 
-  // Grouper par jour
-  const coursByJour = JOURS.reduce((acc, jour) => {
-    acc[jour] = cours.filter(c => c.jour_semaine === jour);
-    return acc;
-  }, {});
+  const sf = (k,v) => setForm(f=>({...f,[k]:v}));
+  const coursByJour = JOURS.reduce((acc,j) => { acc[j] = cours.filter(c=>c.jour_semaine===j); return acc; }, {});
 
   return (
-    <div style={styles.container}>
-      <div style={styles.header}>
+    <div className="page-wrapper">
+      <div className="page-header">
         <div>
-          <h2 style={styles.title}>📅 Calendrier des Cours</h2>
-          <p style={styles.subtitle}>{cours.length} cours planifié(s)</p>
+          <h1 className="page-title">📅 Calendrier des Cours</h1>
+          <p className="page-subtitle">{cours.length} cours planifié(s)</p>
         </div>
-        {selectedCentre && (
-          <button onClick={() => { setShowForm(true); setEditing(null); }} style={styles.btnPrimary}>
+        {/* Bouton visible pour national ET centre */}
+        {canManage && effectiveCentre && (
+          <button className="btn btn-teal" onClick={() => { setShowForm(true); setEditing(null); setForm(EMPTY_FORM); }}>
             + Ajouter un Cours
           </button>
         )}
       </div>
 
+      <div className="stat-grid">
+        <div className="stat-card">
+          <div className="stat-icon stat-icon-teal">📅</div>
+          <div><div className="stat-value">{cours.length}</div><div className="stat-label">Cours planifiés</div></div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-icon stat-icon-green">🗓️</div>
+          <div><div className="stat-value">{JOURS.filter(j=>coursByJour[j].length>0).length}</div><div className="stat-label">Jours actifs</div></div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-icon stat-icon-orange">👨‍🏫</div>
+          <div><div className="stat-value">{[...new Set(cours.map(c=>c.instructeur).filter(Boolean))].length}</div><div className="stat-label">Instructeurs</div></div>
+        </div>
+      </div>
+
+      {success && <div className="alert alert-success">✅ {success}</div>}
+      {error   && <div className="alert alert-error">⚠️ {error}</div>}
+
+      {/* Filtre centre — national uniquement */}
       {isNational && (
-        <div style={styles.filterBar}>
-          <label style={styles.label}>Centre :</label>
-          <select value={selectedCentre} onChange={e => setSelectedCentre(e.target.value)} style={styles.select}>
+        <div className="filter-bar">
+          <label className="form-label" style={{whiteSpace:'nowrap'}}>🏛️ Centre :</label>
+          <select value={selCentre} onChange={e=>setSelCentre(e.target.value)} style={{maxWidth:320}}>
             <option value="">-- Choisir un centre --</option>
             {centres.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
         </div>
       )}
 
-      {showForm && (
-        <div style={styles.formCard}>
-          <h3 style={styles.formTitle}>{editing ? 'Modifier Cours' : 'Nouveau Cours'}</h3>
-          <form onSubmit={handleSubmit}>
-            <div style={styles.grid3}>
-              <div>
-                <label style={styles.label}>Titre du cours</label>
-                <input value={form.titre} onChange={e => setForm({...form, titre: e.target.value})} required style={styles.input} />
+      {showForm && canManage && (
+        <div className="form-card">
+          <h3 style={{fontSize:17,fontWeight:700,marginBottom:16}}>{editing ? '✏️ Modifier le Cours' : '➕ Nouveau Cours'}</h3>
+          <form onSubmit={submit}>
+            <div className="form-grid-3">
+              <div className="form-field">
+                <label className="form-label">Titre du cours *</label>
+                <input value={form.titre} onChange={e=>sf('titre',e.target.value)} required />
               </div>
-              <div>
-                <label style={styles.label}>Instructeur</label>
-                <input value={form.instructeur} onChange={e => setForm({...form, instructeur: e.target.value})} style={styles.input} />
+              <div className="form-field">
+                <label className="form-label">Instructeur</label>
+                <input value={form.instructeur} onChange={e=>sf('instructeur',e.target.value)} />
               </div>
-              <div>
-                <label style={styles.label}>Filière</label>
-                <select value={form.filiere_id} onChange={e => setForm({...form, filiere_id: e.target.value})} style={styles.select}>
+              <div className="form-field">
+                <label className="form-label">Filière</label>
+                <select value={form.filiere_id} onChange={e=>sf('filiere_id',e.target.value)}>
                   <option value="">-- Aucune --</option>
                   {filieres.map(f => <option key={f.id} value={f.id}>{f.nom}</option>)}
                 </select>
               </div>
-              <div>
-                <label style={styles.label}>Jour</label>
-                <select value={form.jour_semaine} onChange={e => setForm({...form, jour_semaine: e.target.value})} style={styles.select}>
+              <div className="form-field">
+                <label className="form-label">Jour</label>
+                <select value={form.jour_semaine} onChange={e=>sf('jour_semaine',e.target.value)}>
                   {JOURS.map(j => <option key={j}>{j}</option>)}
                 </select>
               </div>
-              <div>
-                <label style={styles.label}>Heure début</label>
-                <input type="time" value={form.heure_debut} onChange={e => setForm({...form, heure_debut: e.target.value})} style={styles.input} />
+              <div className="form-field">
+                <label className="form-label">Heure début</label>
+                <input type="time" value={form.heure_debut} onChange={e=>sf('heure_debut',e.target.value)} />
               </div>
-              <div>
-                <label style={styles.label}>Heure fin</label>
-                <input type="time" value={form.heure_fin} onChange={e => setForm({...form, heure_fin: e.target.value})} style={styles.input} />
+              <div className="form-field">
+                <label className="form-label">Heure fin</label>
+                <input type="time" value={form.heure_fin} onChange={e=>sf('heure_fin',e.target.value)} />
               </div>
-              <div>
-                <label style={styles.label}>Salle</label>
-                <input value={form.salle} onChange={e => setForm({...form, salle: e.target.value})} style={styles.input} />
+              <div className="form-field">
+                <label className="form-label">Salle</label>
+                <input value={form.salle} onChange={e=>sf('salle',e.target.value)} />
               </div>
             </div>
-            <div style={styles.formActions}>
-              <button type="button" onClick={() => setShowForm(false)} style={styles.btnSecondary}>Annuler</button>
-              <button type="submit" style={styles.btnPrimary}>{editing ? 'Mettre à jour' : 'Ajouter'}</button>
+            <div className="form-actions">
+              <button type="button" className="btn btn-ghost" onClick={() => { setShowForm(false); setEditing(null); }}>Annuler</button>
+              <button type="submit" className="btn btn-teal">{editing ? 'Mettre à jour' : 'Ajouter'}</button>
             </div>
           </form>
         </div>
       )}
 
-      {/* Grille par jour */}
-      <div style={styles.calGrid}>
-        {JOURS.map(jour => (
-          <div key={jour} style={styles.dayCol}>
-            <div style={styles.dayHeader}>{jour}</div>
-            <div style={styles.dayBody}>
-              {coursByJour[jour].length === 0 ? (
-                <p style={styles.noCours}>—</p>
-              ) : (
-                coursByJour[jour].map(c => (
-                  <div key={c.id} style={styles.coursCard}>
-                    <p style={styles.coursTitle}>{c.titre}</p>
-                    {c.heure_debut && <p style={styles.coursMeta}>⏰ {c.heure_debut.slice(0,5)} – {c.heure_fin?.slice(0,5)}</p>}
-                    {c.instructeur && <p style={styles.coursMeta}>👨‍🏫 {c.instructeur}</p>}
-                    {c.filieres?.nom && <p style={styles.coursMeta}>📚 {c.filieres.nom}</p>}
-                    {c.salle && <p style={styles.coursMeta}>🚪 {c.salle}</p>}
-                    <div style={styles.coursActions}>
-                      <button onClick={() => handleEdit(c)} style={styles.btnIconSm}>✏️</button>
-                      <button onClick={() => handleDelete(c.id)} style={styles.btnIconSm}>🗑️</button>
-                    </div>
+      {!effectiveCentre && isNational ? (
+        <div className="empty-state"><div className="emoji">🏛️</div><h3>Sélectionnez un centre</h3><p>Choisissez un centre pour voir son calendrier.</p></div>
+      ) : (
+        /* Calendrier scrollable sur mobile */
+        <div style={{background:'var(--surface)',borderRadius:'var(--r-md)',border:'1px solid var(--border)',overflow:'hidden',boxShadow:'var(--shadow-sm)'}}>
+          <div style={{overflowX:'auto', WebkitOverflowScrolling:'touch'}}>
+            <div style={{display:'grid', gridTemplateColumns:'repeat(7, minmax(130px, 1fr))', gap:0, minWidth:700}}>
+              {JOURS.map(jour => (
+                <div key={jour} style={{borderRight:'1px solid var(--border)'}}>
+                  <div style={{background:'var(--teal)',color:'#fff',padding:'10px 8px',textAlign:'center',fontSize:12,fontWeight:700,letterSpacing:'0.5px'}}>
+                    {jour.slice(0,3).toUpperCase()}
                   </div>
-                ))
-              )}
+                  <div style={{padding:8,minHeight:120,display:'flex',flexDirection:'column',gap:6}}>
+                    {coursByJour[jour].length === 0 ? (
+                      <p style={{textAlign:'center',color:'var(--border)',fontSize:18,marginTop:16}}>—</p>
+                    ) : (
+                      coursByJour[jour].map(c => (
+                        <div key={c.id} style={{background:'var(--teal-ultra)',borderRadius:8,padding:'8px 10px',border:'1px solid rgba(0,143,181,0.2)'}}>
+                          <p style={{fontSize:12,fontWeight:700,color:'var(--teal-dark)',marginBottom:3}}>{c.titre}</p>
+                          {c.heure_debut && <p style={{fontSize:11,color:'var(--text-secondary)',margin:'1px 0'}}>⏰ {c.heure_debut.slice(0,5)}–{c.heure_fin?.slice(0,5)}</p>}
+                          {c.instructeur && <p style={{fontSize:11,color:'var(--text-secondary)',margin:'1px 0'}}>👤 {c.instructeur}</p>}
+                          {c.filieres?.nom && <p style={{fontSize:11,color:'var(--text-muted)',margin:'1px 0'}}>📚 {c.filieres.nom}</p>}
+                          {c.salle && <p style={{fontSize:11,color:'var(--text-muted)',margin:'1px 0'}}>🚪 {c.salle}</p>}
+                          {canManage && (
+                            <div style={{display:'flex',gap:4,marginTop:5}}>
+                              <button onClick={()=>handleEdit(c)} style={{background:'none',border:'none',cursor:'pointer',fontSize:12,padding:'2px 4px',borderRadius:4}} title="Modifier">✏️</button>
+                              <button onClick={()=>handleDelete(c.id)} style={{background:'none',border:'none',cursor:'pointer',fontSize:12,padding:'2px 4px',borderRadius:4}} title="Supprimer">🗑️</button>
+                            </div>
+                          )}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
-        ))}
-      </div>
+          {cours.length === 0 && effectiveCentre && (
+            <div className="empty-state"><div className="emoji">📅</div><h3>Aucun cours planifié</h3><p>Ajoutez le premier cours de ce centre.</p></div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
-
-const styles = {
-  container: { padding: '32px', fontFamily: "'Segoe UI', sans-serif" },
-  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' },
-  title: { fontSize: '24px', fontWeight: '700', color: '#1a3a5c', margin: 0 },
-  subtitle: { fontSize: '14px', color: '#6c757d', marginTop: '4px' },
-  filterBar: { display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px', background: '#f8fafc', padding: '12px 16px', borderRadius: '8px' },
-  label: { fontSize: '13px', fontWeight: '600', color: '#374151' },
-  select: { padding: '10px 12px', borderRadius: '8px', border: '1.5px solid #d1d5db', fontSize: '14px', minWidth: '200px' },
-  input: { width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1.5px solid #d1d5db', fontSize: '14px', boxSizing: 'border-box' },
-  formCard: { background: '#fff', borderRadius: '12px', padding: '24px', marginBottom: '24px', border: '1px solid #e5e7eb', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' },
-  formTitle: { fontSize: '18px', fontWeight: '700', color: '#1a3a5c', marginBottom: '16px' },
-  grid3: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '16px' },
-  formActions: { display: 'flex', justifyContent: 'flex-end', gap: '12px' },
-  calGrid: { display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '8px', overflowX: 'auto' },
-  dayCol: { minWidth: '130px', background: '#fff', borderRadius: '10px', border: '1px solid #e5e7eb', overflow: 'hidden' },
-  dayHeader: { background: '#1a3a5c', color: '#fff', padding: '10px', textAlign: 'center', fontSize: '13px', fontWeight: '700' },
-  dayBody: { padding: '8px', minHeight: '100px', display: 'flex', flexDirection: 'column', gap: '8px' },
-  noCours: { textAlign: 'center', color: '#d1d5db', fontSize: '20px', marginTop: '20px' },
-  coursCard: { background: '#eff6ff', borderRadius: '8px', padding: '10px', border: '1px solid #bfdbfe' },
-  coursTitle: { fontSize: '13px', fontWeight: '700', color: '#1d4ed8', margin: '0 0 4px' },
-  coursMeta: { fontSize: '11px', color: '#374151', margin: '2px 0' },
-  coursActions: { display: 'flex', gap: '4px', marginTop: '6px' },
-  btnPrimary: { background: '#1a3a5c', color: '#fff', border: 'none', padding: '10px 20px', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: '600' },
-  btnSecondary: { background: '#f1f5f9', color: '#374151', border: '1px solid #d1d5db', padding: '10px 20px', borderRadius: '8px', cursor: 'pointer', fontSize: '14px' },
-  btnIconSm: { background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', padding: '2px' },
-};

@@ -2,23 +2,29 @@ import { useState, useEffect } from 'react';
 import { getFilieresByCentre, createFiliere, updateFiliere, deleteFiliere, getCentres } from '../lib/api';
 
 export default function FilieresPage({ profile }) {
-  const [filieres, setFilieres]     = useState([]);
-  const [centres, setCentres]       = useState([]);
-  const [selCentre, setSelCentre]   = useState(profile?.centre_id||'');
-  const [showForm, setShowForm]     = useState(false);
-  const [editing, setEditing]       = useState(null);
-  const [form, setForm]             = useState({ nom:'', description:'', status:'actif' });
-  const [error, setError]           = useState('');
-  const [success, setSuccess]       = useState('');
-  const [loading, setLoading]       = useState(false);
+  const [filieres, setFilieres]   = useState([]);
+  const [centres, setCentres]     = useState([]);
+  const [selCentre, setSelCentre] = useState(profile?.centre_id||'');
+  const [showForm, setShowForm]   = useState(false);
+  const [editing, setEditing]     = useState(null);
+  const [form, setForm]           = useState({ nom:'', description:'', status:'actif' });
+  const [error, setError]         = useState('');
+  const [success, setSuccess]     = useState('');
+  const [loading, setLoading]     = useState(false);
 
   const isNational = profile?.role === 'national';
+  const isCentre   = profile?.role === 'centre';
+  const canManage  = isNational || isCentre;
+  const effectiveCentre = isCentre ? profile.centre_id : selCentre;
 
   useEffect(() => {
     if (isNational) getCentres().then(({data}) => setCentres(data||[]));
-    if (selCentre) load(selCentre);
+    if (effectiveCentre) load(effectiveCentre);
   }, []);
-  useEffect(() => { if (selCentre) load(selCentre); }, [selCentre]);
+
+  useEffect(() => {
+    if (isNational && selCentre) load(selCentre);
+  }, [selCentre]);
 
   const load = async (cId) => {
     setLoading(true);
@@ -29,16 +35,25 @@ export default function FilieresPage({ profile }) {
 
   const submit = async (e) => {
     e.preventDefault(); setError(''); setSuccess('');
-    const payload = { ...form, centre_id: selCentre };
+    const payload = { ...form, centre_id: effectiveCentre };
     const { error } = editing ? await updateFiliere(editing.id, payload) : await createFiliere(payload);
     if (error) return setError(error.message);
     setSuccess(editing ? 'Filière mise à jour !' : 'Filière créée !');
     setShowForm(false); setEditing(null); setForm({ nom:'', description:'', status:'actif' });
-    load(selCentre);
+    load(effectiveCentre);
   };
 
-  const handleEdit = (f) => { setEditing(f); setForm({ nom:f.nom, description:f.description||'', status:f.status||'actif' }); setShowForm(true); window.scrollTo({top:0,behavior:'smooth'}); };
-  const handleDelete = async (id) => { if (!window.confirm('Supprimer cette filière ?')) return; await deleteFiliere(id); load(selCentre); };
+  const handleEdit = (f) => {
+    setEditing(f);
+    setForm({ nom:f.nom, description:f.description||'', status:f.status||'actif' });
+    setShowForm(true);
+    window.scrollTo({ top:0, behavior:'smooth' });
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm('Supprimer cette filière ?')) return;
+    await deleteFiliere(id); load(effectiveCentre);
+  };
 
   return (
     <div className="page-wrapper">
@@ -47,7 +62,8 @@ export default function FilieresPage({ profile }) {
           <h1 className="page-title">📚 Filières</h1>
           <p className="page-subtitle">{filieres.length} filière(s) enregistrée(s)</p>
         </div>
-        {selCentre && (
+        {/* Bouton visible pour national ET centre dès qu'un centre est connu */}
+        {canManage && effectiveCentre && (
           <button className="btn btn-teal" onClick={() => { setShowForm(true); setEditing(null); setForm({ nom:'', description:'', status:'actif' }); }}>
             + Nouvelle Filière
           </button>
@@ -68,6 +84,7 @@ export default function FilieresPage({ profile }) {
       {success && <div className="alert alert-success">✅ {success}</div>}
       {error   && <div className="alert alert-error">⚠️ {error}</div>}
 
+      {/* Filtre centre — national uniquement */}
       {isNational && (
         <div className="filter-bar">
           <label className="form-label" style={{whiteSpace:'nowrap'}}>🏛️ Centre :</label>
@@ -78,7 +95,7 @@ export default function FilieresPage({ profile }) {
         </div>
       )}
 
-      {showForm && (
+      {showForm && canManage && (
         <div className="form-card">
           <h3 style={{fontSize:17,fontWeight:700,marginBottom:16}}>{editing ? '✏️ Modifier la Filière' : '➕ Nouvelle Filière'}</h3>
           <form onSubmit={submit}>
@@ -107,7 +124,7 @@ export default function FilieresPage({ profile }) {
         </div>
       )}
 
-      {!selCentre && isNational ? (
+      {!effectiveCentre && isNational ? (
         <div className="empty-state"><div className="emoji">🏛️</div><h3>Sélectionnez un centre</h3><p>Choisissez un centre pour voir ses filières.</p></div>
       ) : loading ? (
         <div className="loading-center"><div className="spinner" /><p>Chargement…</p></div>
@@ -125,10 +142,12 @@ export default function FilieresPage({ profile }) {
                 </div>
               </div>
               {f.description && <p style={{fontSize:13,color:'var(--text-secondary)',marginBottom:14,lineHeight:1.5}}>{f.description}</p>}
-              <div style={{display:'flex',gap:8,paddingTop:12,borderTop:'1px solid var(--border)'}}>
-                <button className="btn btn-ghost" style={{flex:1,padding:'8px',fontSize:13}} onClick={()=>handleEdit(f)}>✏️ Modifier</button>
-                <button className="btn btn-danger" style={{padding:'8px 12px',fontSize:13,borderRadius:8}} onClick={()=>handleDelete(f.id)}>🗑️</button>
-              </div>
+              {canManage && (
+                <div style={{display:'flex',gap:8,paddingTop:12,borderTop:'1px solid var(--border)'}}>
+                  <button className="btn btn-ghost" style={{flex:1,padding:'8px',fontSize:13}} onClick={()=>handleEdit(f)}>✏️ Modifier</button>
+                  <button className="btn btn-danger" style={{padding:'8px 12px',fontSize:13,borderRadius:8}} onClick={()=>handleDelete(f.id)}>🗑️</button>
+                </div>
+              )}
             </div>
           ))}
         </div>

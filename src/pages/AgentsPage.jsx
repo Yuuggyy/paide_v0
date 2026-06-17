@@ -18,24 +18,34 @@ function Field({ label, value, onChange, type='text', required, children }) {
 }
 
 export default function AgentsPage({ profile }) {
-  const [agents, setAgents]         = useState([]);
-  const [centres, setCentres]       = useState([]);
-  const [selCentre, setSelCentre]   = useState(profile?.centre_id || '');
-  const [loading, setLoading]       = useState(false);
-  const [showForm, setShowForm]     = useState(false);
-  const [editing, setEditing]       = useState(null);
+  const [agents, setAgents]               = useState([]);
+  const [centres, setCentres]             = useState([]);
+  const [selCentre, setSelCentre]         = useState(profile?.centre_id || '');
+  const [loading, setLoading]             = useState(false);
+  const [showForm, setShowForm]           = useState(false);
+  const [editing, setEditing]             = useState(null);
   const [selectedAgent, setSelectedAgent] = useState(null);
-  const [form, setForm]             = useState(EMPTY);
-  const [error, setError]           = useState('');
-  const [success, setSuccess]       = useState('');
+  const [form, setForm]                   = useState(EMPTY);
+  const [error, setError]                 = useState('');
+  const [success, setSuccess]             = useState('');
 
   const isNational = profile?.role === 'national';
+  const isCentre   = profile?.role === 'centre';
+  // National et Centre ont les mêmes droits de gestion des agents
+  const canManage  = isNational || isCentre;
 
   useEffect(() => {
     if (isNational) getCentres().then(({data}) => setCentres(data||[]));
-    if (selCentre) load(selCentre);
+    // Le centre a son centre_id fixe
+    const cId = isCentre ? profile.centre_id : selCentre;
+    if (cId) load(cId);
   }, []);
-  useEffect(() => { if (selCentre) load(selCentre); }, [selCentre]);
+
+  useEffect(() => {
+    if (isNational && selCentre) load(selCentre);
+  }, [selCentre]);
+
+  const effectiveCentre = isCentre ? profile.centre_id : selCentre;
 
   const load = async (cId) => {
     setLoading(true);
@@ -48,24 +58,24 @@ export default function AgentsPage({ profile }) {
 
   const submit = async (e) => {
     e.preventDefault(); setError(''); setSuccess('');
-    const payload = { ...form, centre_id: selCentre, salaire: parseFloat(form.salaire)||0, prime: parseFloat(form.prime)||0 };
-    const fn = editing ? updateAgent(editing.id, payload) : createAgent(payload);
-    const { error } = await fn;
+    const payload = { ...form, centre_id: effectiveCentre, salaire: parseFloat(form.salaire)||0, prime: parseFloat(form.prime)||0 };
+    const { error } = editing ? await updateAgent(editing.id, payload) : await createAgent(payload);
     if (error) return setError(error.message);
-    setSuccess(editing ? 'Agent mis à jour !' : 'Agent créé !');
+    setSuccess(editing ? 'Agent mis à jour !' : 'Agent créé avec succès !');
     setShowForm(false); setEditing(null); setForm(EMPTY);
-    load(selCentre);
+    load(effectiveCentre);
   };
 
   const handleEdit = (a) => {
     setEditing(a);
     setForm({ ...a, salaire: a.salaire?.toString()||'', prime: a.prime?.toString()||'' });
-    setShowForm(true); window.scrollTo({top:0, behavior:'smooth'});
+    setShowForm(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleDelete = async (id) => {
     if (!window.confirm('Supprimer cet agent ?')) return;
-    await deleteAgent(id); load(selCentre);
+    await deleteAgent(id); load(effectiveCentre);
   };
 
   const STATUS_BADGE = { actif:'badge-green', inactif:'badge-gray', suspendu:'badge-red' };
@@ -78,7 +88,8 @@ export default function AgentsPage({ profile }) {
           <h1 className="page-title">👥 Gestion des Agents</h1>
           <p className="page-subtitle">{agents.length} agent(s) enregistré(s)</p>
         </div>
-        {selCentre && (
+        {/* Bouton visible pour national ET centre, mais seulement si un centre est sélectionné */}
+        {canManage && effectiveCentre && (
           <button className="btn btn-teal" onClick={() => { setShowForm(true); setEditing(null); setForm(EMPTY); }}>
             + Nouvel Agent
           </button>
@@ -105,7 +116,7 @@ export default function AgentsPage({ profile }) {
       {success && <div className="alert alert-success">✅ {success}</div>}
       {error   && <div className="alert alert-error">⚠️ {error}</div>}
 
-      {/* Filtre centre */}
+      {/* Filtre centre — national uniquement, centre a son centre fixe */}
       {isNational && (
         <div className="filter-bar">
           <label className="form-label" style={{whiteSpace:'nowrap'}}>🏛️ Centre :</label>
@@ -117,10 +128,10 @@ export default function AgentsPage({ profile }) {
       )}
 
       {/* Formulaire */}
-      {showForm && (
+      {showForm && canManage && (
         <div className="form-card">
-          <h3 style={{fontSize:17, fontWeight:700, marginBottom:4}}>{editing ? '✏️ Modifier l\'Agent' : '➕ Nouvel Agent'}</h3>
-          <p style={{fontSize:13, color:'var(--text-muted)', marginBottom:8}}>Remplissez les informations de l'agent.</p>
+          <h3 style={{fontSize:17,fontWeight:700,marginBottom:4}}>{editing ? '✏️ Modifier l\'Agent' : '➕ Nouvel Agent'}</h3>
+          <p style={{fontSize:13,color:'var(--text-muted)',marginBottom:8}}>Remplissez les informations de l'agent.</p>
           <form onSubmit={submit}>
             <div className="form-section">📋 Identification Personnelle</div>
             <div className="form-grid-3">
@@ -133,7 +144,6 @@ export default function AgentsPage({ profile }) {
               <Field label="Email" value={form.email} type="email" onChange={v=>sf('email',v)} />
               <Field label="Adresse physique / électronique" value={form.adresse_electronique} onChange={v=>sf('adresse_electronique',v)} />
             </div>
-
             <div className="form-section">🏢 Identification Administrative</div>
             <div className="form-grid-3">
               <Field label="Matricule" value={form.matricule} onChange={v=>sf('matricule',v)} />
@@ -158,7 +168,6 @@ export default function AgentsPage({ profile }) {
                 </select>
               </Field>
             </div>
-
             <div className="form-actions">
               <button type="button" className="btn btn-ghost" onClick={() => { setShowForm(false); setEditing(null); }}>Annuler</button>
               <button type="submit" className="btn btn-teal">{editing ? 'Mettre à jour' : 'Créer l\'Agent'}</button>
@@ -168,12 +177,8 @@ export default function AgentsPage({ profile }) {
       )}
 
       {/* Contenu */}
-      {!selCentre && isNational ? (
-        <div className="empty-state">
-          <div className="emoji">🏛️</div>
-          <h3>Sélectionnez un centre</h3>
-          <p>Choisissez un centre dans le filtre ci-dessus pour voir ses agents.</p>
-        </div>
+      {!effectiveCentre && isNational ? (
+        <div className="empty-state"><div className="emoji">🏛️</div><h3>Sélectionnez un centre</h3><p>Choisissez un centre dans le filtre ci-dessus pour voir ses agents.</p></div>
       ) : loading ? (
         <div className="loading-center"><div className="spinner" /><p>Chargement…</p></div>
       ) : (
@@ -200,8 +205,8 @@ export default function AgentsPage({ profile }) {
                       <td>
                         <div style={{display:'flex',gap:6}}>
                           <button className="btn-icon" onClick={()=>setSelectedAgent(a)} title="Voir fiche">👁️</button>
-                          <button className="btn-icon" onClick={()=>handleEdit(a)} title="Modifier">✏️</button>
-                          <button className="btn-icon btn-icon-danger" onClick={()=>handleDelete(a.id)} title="Supprimer">🗑️</button>
+                          {canManage && <button className="btn-icon" onClick={()=>handleEdit(a)} title="Modifier">✏️</button>}
+                          {canManage && <button className="btn-icon btn-icon-danger" onClick={()=>handleDelete(a.id)} title="Supprimer">🗑️</button>}
                         </div>
                       </td>
                     </tr>
@@ -232,8 +237,8 @@ export default function AgentsPage({ profile }) {
                   </div>
                   <div className="agent-card-mobile-actions">
                     <button className="btn btn-ghost" style={{flex:1,padding:'8px',fontSize:13}} onClick={()=>setSelectedAgent(a)}>👁️ Fiche</button>
-                    <button className="btn btn-teal" style={{flex:1,padding:'8px',fontSize:13}} onClick={()=>handleEdit(a)}>✏️ Modifier</button>
-                    <button className="btn btn-danger" style={{padding:'8px 12px',fontSize:13,borderRadius:8}} onClick={()=>handleDelete(a.id)}>🗑️</button>
+                    {canManage && <button className="btn btn-teal" style={{flex:1,padding:'8px',fontSize:13}} onClick={()=>handleEdit(a)}>✏️ Modifier</button>}
+                    {canManage && <button className="btn btn-danger" style={{padding:'8px 12px',fontSize:13,borderRadius:8}} onClick={()=>handleDelete(a.id)}>🗑️</button>}
                   </div>
                 </div>
               ))
