@@ -1,11 +1,8 @@
-// API Admin — utilise la SERVICE ROLE KEY (bypass RLS total)
-// VITE_SUPABASE_SERVICE_KEY doit être dans .env et dans Netlify env vars
+// API Admin — SERVICE ROLE KEY (bypass RLS total)
+// VITE_SUPABASE_SERVICE_KEY dans .env et Netlify env vars
 
 import { createClient } from '@supabase/supabase-js';
 
-// Client service_role — bypass complet de la RLS
-// auth.persistSession: false obligatoire pour éviter que le client
-// utilise la session de l'utilisateur connecté au lieu de la service_role
 const supabaseAdmin = createClient(
   import.meta.env.VITE_SUPABASE_URL,
   import.meta.env.VITE_SUPABASE_SERVICE_KEY,
@@ -18,7 +15,8 @@ const supabaseAdmin = createClient(
 );
 
 // ─────────────────────────────────────────────
-// Créer un utilisateur Auth + mettre à jour son profil
+// Créer un utilisateur Auth + profil complet
+// Le trigger handle_new_user lit les metadata et remplit profiles automatiquement
 // ─────────────────────────────────────────────
 export const createUserWithLogin = async ({
   email, password, full_name, role,
@@ -27,40 +25,45 @@ export const createUserWithLogin = async ({
   sous_coordination_id = null,
 }) => {
 
-  // 1. Créer dans Auth (email_confirm: true = pas besoin de validation email)
+  // Passer TOUTES les infos dans user_metadata
+  // Le trigger Supabase les lit et les écrit dans profiles directement
+  const metadata = {
+    full_name,
+    role,
+    ...(centre_id            && { centre_id }),
+    ...(coordination_id      && { coordination_id }),
+    ...(sous_coordination_id && { sous_coordination_id }),
+  };
+
   const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
     email,
     password,
     email_confirm: true,
-    user_metadata: { full_name, role },
+    user_metadata: metadata,
   });
 
   if (authError) return { error: authError };
-  const userId = authData.user.id;
 
-  // 2. Attendre un court instant que le trigger handle_new_user crée le profil
-  await new Promise(r => setTimeout(r, 500));
-
-  // 3. Mettre à jour le profil avec les vraies valeurs
-  // Utiliser UPSERT pour garantir que le profil existe même si le trigger a échoué
+  // Le trigger a déjà créé le profil avec les bonnes valeurs
+  // On fait quand même un upsert de sécurité pour garantir la cohérence
   const { error: profileError } = await supabaseAdmin
     .from('profiles')
     .upsert({
-      id: userId,
+      id: authData.user.id,
+      email,
       full_name,
       role,
-      centre_id,
-      coordination_id,
-      sous_coordination_id,
-      email,
+      centre_id:            centre_id            || null,
+      coordination_id:      coordination_id      || null,
+      sous_coordination_id: sous_coordination_id || null,
     }, { onConflict: 'id' });
 
   if (profileError) return { error: profileError };
-  return { data: { id: userId, email } };
+  return { data: { id: authData.user.id, email } };
 };
 
 // ─────────────────────────────────────────────
-// Supprimer un utilisateur Auth par son id
+// Supprimer un utilisateur Auth
 // ─────────────────────────────────────────────
 export const deleteUserAuth = async (userId) => {
   const { error } = await supabaseAdmin.auth.admin.deleteUser(userId);
@@ -69,7 +72,6 @@ export const deleteUserAuth = async (userId) => {
 
 // ─────────────────────────────────────────────
 // Supprimer tous les utilisateurs Auth liés à un centre
-// À appeler AVANT de supprimer le centre
 // ─────────────────────────────────────────────
 export const deleteUsersOfCentre = async (centreId) => {
   const { data: profiles, error: fetchError } = await supabaseAdmin
@@ -83,7 +85,6 @@ export const deleteUsersOfCentre = async (centreId) => {
   for (const p of profiles) {
     await supabaseAdmin.auth.admin.deleteUser(p.id);
   }
-
   return { error: null };
 };
 
