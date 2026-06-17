@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getRapportsByCentre, createRapport, getAgentsByCentre, getCentres } from '../lib/api';
+import { getRapportsByCentre, createRapport, updateRapport, deleteRapport, getAgentsByCentre, getCentres } from '../lib/api';
 
 const TYPE_STYLE = {
   retard:        { badge:'badge-orange', emoji:'⏰' },
@@ -9,19 +9,22 @@ const TYPE_STYLE = {
   autre:         { badge:'badge-gray',   emoji:'📋' },
 };
 
+const EMPTY = {
+  agent_id:'', type_rapport:'retard', description:'',
+  date_rapport: new Date().toISOString().split('T')[0], severite:'moyen',
+};
+
 export default function RapportsPage({ profile }) {
   const [rapports, setRapports]   = useState([]);
   const [agents, setAgents]       = useState([]);
   const [centres, setCentres]     = useState([]);
-  const [selCentre, setSelCentre] = useState(profile?.centre_id||'');
+  const [selCentre, setSelCentre] = useState(profile?.centre_id || '');
   const [showForm, setShowForm]   = useState(false);
+  const [editing, setEditing]     = useState(null); // id du rapport en cours d'édition
   const [loading, setLoading]     = useState(false);
   const [error, setError]         = useState('');
   const [success, setSuccess]     = useState('');
-  const [form, setForm] = useState({
-    agent_id:'', type_rapport:'retard', description:'',
-    date_rapport: new Date().toISOString().split('T')[0], severite:'moyen',
-  });
+  const [form, setForm]           = useState(EMPTY);
 
   const isNational = profile?.role === 'national';
   const isCentre   = profile?.role === 'centre';
@@ -29,7 +32,7 @@ export default function RapportsPage({ profile }) {
   const effectiveCentre = isCentre ? (profile?.centre_id || null) : (selCentre || null);
 
   useEffect(() => {
-    if (isNational) getCentres().then(({data}) => setCentres(data||[]));
+    if (isNational) getCentres().then(({ data }) => setCentres(data || []));
     if (effectiveCentre) { load(effectiveCentre); loadAgents(effectiveCentre); }
   }, []);
 
@@ -40,25 +43,71 @@ export default function RapportsPage({ profile }) {
   const load = async (cId) => {
     setLoading(true);
     const { data } = await getRapportsByCentre(cId);
-    setRapports(data||[]);
+    setRapports(data || []);
     setLoading(false);
   };
+
   const loadAgents = async (cId) => {
     const { data } = await getAgentsByCentre(cId);
-    setAgents(data||[]);
+    setAgents(data || []);
+  };
+
+  const sf = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  const openCreate = () => {
+    setEditing(null);
+    setForm(EMPTY);
+    setError('');
+    setShowForm(true);
+  };
+
+  const openEdit = (r) => {
+    setEditing(r.id);
+    setForm({
+      agent_id:     r.agent_id     || '',
+      type_rapport: r.type_rapport || 'retard',
+      description:  r.description  || '',
+      date_rapport: r.date_rapport || new Date().toISOString().split('T')[0],
+      severite:     r.severite     || 'moyen',
+    });
+    setError('');
+    setShowForm(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm('Supprimer ce renseignement ?')) return;
+    setError('');
+    const { error } = await deleteRapport(id);
+    if (error) return setError(error.message);
+    setSuccess('Renseignement supprimé.');
+    load(effectiveCentre);
   };
 
   const submit = async (e) => {
     e.preventDefault(); setError(''); setSuccess('');
-    const { error } = await createRapport({ ...form, centre_id: effectiveCentre });
-    if (error) return setError(error.message);
-    setSuccess('Renseignement enregistré !');
+
+    if (editing) {
+      const { error } = await updateRapport(editing, {
+        agent_id:     form.agent_id,
+        type_rapport: form.type_rapport,
+        description:  form.description,
+        date_rapport: form.date_rapport,
+        severite:     form.severite,
+      });
+      if (error) return setError(error.message);
+      setSuccess('Renseignement mis à jour !');
+    } else {
+      const { error } = await createRapport({ ...form, centre_id: effectiveCentre });
+      if (error) return setError(error.message);
+      setSuccess('Renseignement enregistré !');
+    }
+
     setShowForm(false);
-    setForm({ agent_id:'', type_rapport:'retard', description:'', date_rapport: new Date().toISOString().split('T')[0], severite:'moyen' });
+    setEditing(null);
+    setForm(EMPTY);
     load(effectiveCentre);
   };
-
-  const sf = (k,v) => setForm(f=>({...f,[k]:v}));
 
   return (
     <div className="page-wrapper">
@@ -67,9 +116,8 @@ export default function RapportsPage({ profile }) {
           <h1 className="page-title">📋 Renseignements</h1>
           <p className="page-subtitle">{rapports.length} renseignement(s) enregistré(s)</p>
         </div>
-        {/* Bouton visible pour national ET centre */}
         {canManage && (
-          <button className="btn btn-teal" onClick={() => { setShowForm(true); setForm({ agent_id:'', type_rapport:'retard', description:'', date_rapport: new Date().toISOString().split('T')[0], severite:'moyen' }); }}>
+          <button className="btn btn-teal" onClick={openCreate}>
             + Nouveau Renseignement
           </button>
         )}
@@ -77,9 +125,9 @@ export default function RapportsPage({ profile }) {
 
       <div className="stat-grid">
         {[
-          { label:'Total',        val: rapports.length, icon:'📋', cls:'stat-icon-teal' },
-          { label:'Félicitations',val: rapports.filter(r=>r.type_rapport==='felicitation').length, icon:'🌟', cls:'stat-icon-green' },
-          { label:'Avertissements',val: rapports.filter(r=>['avertissement','suspension'].includes(r.type_rapport)).length, icon:'⚠️', cls:'stat-icon-orange' },
+          { label:'Total',         val: rapports.length, icon:'📋', cls:'stat-icon-teal' },
+          { label:'Félicitations', val: rapports.filter(r => r.type_rapport === 'felicitation').length, icon:'🌟', cls:'stat-icon-green' },
+          { label:'Avertissements',val: rapports.filter(r => ['avertissement','suspension'].includes(r.type_rapport)).length, icon:'⚠️', cls:'stat-icon-orange' },
         ].map(s => (
           <div key={s.label} className="stat-card">
             <div className={`stat-icon ${s.cls}`}>{s.icon}</div>
@@ -88,14 +136,13 @@ export default function RapportsPage({ profile }) {
         ))}
       </div>
 
-      {success && <div className="alert alert-success">✅ {success}</div>}
-      {error   && <div className="alert alert-error">⚠️ {error}</div>}
+      {success && <div className="alert alert-success">✅ {success} <button onClick={()=>setSuccess('')} style={{marginLeft:8,background:'none',border:'none',cursor:'pointer'}}>✕</button></div>}
+      {error   && <div className="alert alert-error">⚠️ {error} <button onClick={()=>setError('')} style={{marginLeft:8,background:'none',border:'none',cursor:'pointer'}}>✕</button></div>}
 
-      {/* Filtre centre — national uniquement */}
       {isNational && (
         <div className="filter-bar">
           <label className="form-label" style={{whiteSpace:'nowrap'}}>🏛️ Centre :</label>
-          <select value={selCentre} onChange={e=>setSelCentre(e.target.value)} style={{maxWidth:320}}>
+          <select value={selCentre} onChange={e => setSelCentre(e.target.value)} style={{maxWidth:320}}>
             <option value="">-- Sélectionner --</option>
             {centres.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
@@ -104,19 +151,21 @@ export default function RapportsPage({ profile }) {
 
       {showForm && canManage && (
         <div className="form-card">
-          <h3 style={{fontSize:17,fontWeight:700,marginBottom:16}}>➕ Nouveau Renseignement</h3>
+          <h3 style={{fontSize:17,fontWeight:700,marginBottom:16}}>
+            {editing ? '✏️ Modifier le Renseignement' : '➕ Nouveau Renseignement'}
+          </h3>
           <form onSubmit={submit}>
             <div className="form-grid">
               <div className="form-field">
                 <label className="form-label">Agent concerné *</label>
-                <select value={form.agent_id} onChange={e=>sf('agent_id',e.target.value)} required>
+                <select value={form.agent_id} onChange={e => sf('agent_id', e.target.value)} required>
                   <option value="">-- Sélectionner un agent --</option>
                   {agents.map(a => <option key={a.id} value={a.id}>{a.noms} ({a.matricule||'—'})</option>)}
                 </select>
               </div>
               <div className="form-field">
                 <label className="form-label">Type</label>
-                <select value={form.type_rapport} onChange={e=>sf('type_rapport',e.target.value)}>
+                <select value={form.type_rapport} onChange={e => sf('type_rapport', e.target.value)}>
                   <option value="retard">⏰ Retard</option>
                   <option value="avertissement">⚠️ Avertissement</option>
                   <option value="suspension">🚫 Suspension</option>
@@ -126,24 +175,24 @@ export default function RapportsPage({ profile }) {
               </div>
               <div className="form-field">
                 <label className="form-label">Sévérité</label>
-                <select value={form.severite} onChange={e=>sf('severite',e.target.value)}>
+                <select value={form.severite} onChange={e => sf('severite', e.target.value)}>
                   <option value="faible">Faible</option>
                   <option value="moyen">Moyen</option>
-                  <option value="grave">Grave</option>
+                  <option value="élevé">Grave (Élevé)</option>
                 </select>
               </div>
               <div className="form-field">
                 <label className="form-label">Date</label>
-                <input type="date" value={form.date_rapport} onChange={e=>sf('date_rapport',e.target.value)} />
+                <input type="date" value={form.date_rapport} onChange={e => sf('date_rapport', e.target.value)} />
               </div>
               <div className="form-field" style={{gridColumn:'1/-1'}}>
                 <label className="form-label">Description *</label>
-                <textarea value={form.description} onChange={e=>sf('description',e.target.value)} required rows={4} style={{resize:'vertical'}} />
+                <textarea value={form.description} onChange={e => sf('description', e.target.value)} required rows={4} style={{resize:'vertical'}} />
               </div>
             </div>
             <div className="form-actions">
-              <button type="button" className="btn btn-ghost" onClick={()=>setShowForm(false)}>Annuler</button>
-              <button type="submit" className="btn btn-teal">Enregistrer</button>
+              <button type="button" className="btn btn-ghost" onClick={() => { setShowForm(false); setEditing(null); }}>Annuler</button>
+              <button type="submit" className="btn btn-teal">{editing ? 'Mettre à jour' : 'Enregistrer'}</button>
             </div>
           </form>
         </div>
@@ -172,6 +221,20 @@ export default function RapportsPage({ profile }) {
                     <p style={{fontSize:13,color:'var(--text-secondary)',lineHeight:1.5,marginBottom:4}}>{r.description}</p>
                     <span style={{fontSize:11,color:'var(--text-muted)'}}>📅 {r.date_rapport}</span>
                   </div>
+                  {canManage && (
+                    <div style={{display:'flex',gap:8,flexShrink:0,alignItems:'center'}}>
+                      <button
+                        className="btn btn-ghost"
+                        style={{padding:'6px 12px',fontSize:12}}
+                        onClick={() => openEdit(r)}
+                      >✏️ Modifier</button>
+                      <button
+                        className="btn"
+                        style={{padding:'6px 12px',fontSize:12,background:'#fee2e2',color:'#dc2626',border:'none'}}
+                        onClick={() => handleDelete(r.id)}
+                      >🗑️ Supprimer</button>
+                    </div>
+                  )}
                 </div>
               </div>
             );
