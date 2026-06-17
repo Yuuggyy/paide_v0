@@ -73,9 +73,15 @@ export default function CentresPage({ profile }) {
           full_name: form.login_nom || `Admin - ${form.name}`,
           role: 'centre', centre_id: c.id
         });
-        if (e2) return setError(`Centre créé mais erreur login : ${e2.message}`);
+        // Ne pas bloquer si erreur login — centre déjà créé
+        if (e2) {
+          setSuccess(`Centre "${form.name}" créé avec succès !`);
+          setError(`⚠️ Login non créé : ${e2.message}`);
+          setShowForm(false); setEditing(null); reset(); load();
+          return;
+        }
       }
-      setSuccess(`Centre "${form.name}" créé avec succès !`);
+      setSuccess(`Centre "${form.name}" créé avec succès ! Login configuré.`);
     }
     setShowForm(false); setEditing(null); reset(); load();
   };
