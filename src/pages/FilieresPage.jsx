@@ -15,7 +15,7 @@ export default function FilieresPage({ profile }) {
   const isNational = profile?.role === 'national';
   const isCentre   = profile?.role === 'centre';
   const canManage  = isNational || isCentre;
-  const effectiveCentre = isCentre ? profile.centre_id : selCentre;
+  const effectiveCentre = isCentre ? (profile?.centre_id || '') : selCentre;
 
   useEffect(() => {
     if (isNational) getCentres().then(({data}) => setCentres(data||[]));
@@ -63,7 +63,7 @@ export default function FilieresPage({ profile }) {
           <p className="page-subtitle">{filieres.length} filière(s) enregistrée(s)</p>
         </div>
         {/* Bouton visible pour national ET centre dès qu'un centre est connu */}
-        {canManage && effectiveCentre && (
+        {canManage && (
           <button className="btn btn-teal" onClick={() => { setShowForm(true); setEditing(null); setForm({ nom:'', description:'', status:'actif' }); }}>
             + Nouvelle Filière
           </button>
@@ -124,7 +124,7 @@ export default function FilieresPage({ profile }) {
         </div>
       )}
 
-      {!effectiveCentre && isNational ? (
+      {(!effectiveCentre && isNational) ? (
         <div className="empty-state"><div className="emoji">🏛️</div><h3>Sélectionnez un centre</h3><p>Choisissez un centre pour voir ses filières.</p></div>
       ) : loading ? (
         <div className="loading-center"><div className="spinner" /><p>Chargement…</p></div>

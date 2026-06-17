@@ -18,7 +18,7 @@ export default function CalendrierPage({ profile }) {
   const isNational = profile?.role === 'national';
   const isCentre   = profile?.role === 'centre';
   const canManage  = isNational || isCentre;
-  const effectiveCentre = isCentre ? profile.centre_id : selCentre;
+  const effectiveCentre = isCentre ? (profile?.centre_id || '') : selCentre;
 
   useEffect(() => {
     if (isNational) getCentres().then(({data}) => setCentres(data||[]));
@@ -65,7 +65,7 @@ export default function CalendrierPage({ profile }) {
           <p className="page-subtitle">{cours.length} cours planifié(s)</p>
         </div>
         {/* Bouton visible pour national ET centre */}
-        {canManage && effectiveCentre && (
+        {canManage && (
           <button className="btn btn-teal" onClick={() => { setShowForm(true); setEditing(null); setForm(EMPTY_FORM); }}>
             + Ajouter un Cours
           </button>
@@ -148,7 +148,7 @@ export default function CalendrierPage({ profile }) {
         </div>
       )}
 
-      {!effectiveCentre && isNational ? (
+      {(!effectiveCentre && isNational) ? (
         <div className="empty-state"><div className="emoji">🏛️</div><h3>Sélectionnez un centre</h3><p>Choisissez un centre pour voir son calendrier.</p></div>
       ) : (
         /* Calendrier scrollable sur mobile */

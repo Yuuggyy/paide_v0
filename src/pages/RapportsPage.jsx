@@ -26,7 +26,7 @@ export default function RapportsPage({ profile }) {
   const isNational = profile?.role === 'national';
   const isCentre   = profile?.role === 'centre';
   const canManage  = isNational || isCentre;
-  const effectiveCentre = isCentre ? profile.centre_id : selCentre;
+  const effectiveCentre = isCentre ? (profile?.centre_id || '') : selCentre;
 
   useEffect(() => {
     if (isNational) getCentres().then(({data}) => setCentres(data||[]));
@@ -68,7 +68,7 @@ export default function RapportsPage({ profile }) {
           <p className="page-subtitle">{rapports.length} renseignement(s) enregistré(s)</p>
         </div>
         {/* Bouton visible pour national ET centre */}
-        {canManage && effectiveCentre && (
+        {canManage && (
           <button className="btn btn-teal" onClick={() => { setShowForm(true); setForm({ agent_id:'', type_rapport:'retard', description:'', date_rapport: new Date().toISOString().split('T')[0], severite:'moyen' }); }}>
             + Nouveau Renseignement
           </button>
@@ -149,7 +149,7 @@ export default function RapportsPage({ profile }) {
         </div>
       )}
 
-      {!effectiveCentre && isNational ? (
+      {(!effectiveCentre && isNational) ? (
         <div className="empty-state"><div className="emoji">🏛️</div><h3>Sélectionnez un centre</h3><p>Choisissez un centre pour voir ses renseignements.</p></div>
       ) : loading ? (
         <div className="loading-center"><div className="spinner" /><p>Chargement…</p></div>
