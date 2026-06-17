@@ -118,8 +118,8 @@ export default function AgentFicheModal({ agent, onClose }) {
             <InfoRow label="Fonction / Poste" value={agent.fonction} />
             <InfoRow label="Statut" value={agent.status} />
             <InfoRow label="Date d'embauche" value={agent.date_embauche} />
-            <InfoRow label="Salaire" value={agent.salaire ? `$${agent.salaire}` : null} />
-            <InfoRow label="Prime" value={agent.prime ? `$${agent.prime}` : null} />
+            <InfoRow label="Salaire" value={agent.salaire ? `${agent.salaire}` : null} />
+            <InfoRow label="Prime" value={agent.prime ? `${agent.prime}` : null} />
           </div>
         )}
 

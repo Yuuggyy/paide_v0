@@ -237,8 +237,8 @@ export default function AgentsPage({ profile }) {
               <Field label="Grade" value={form.grade} onChange={v=>sf('grade',v)} />
               <Field label="Fonction / Poste" value={form.fonction} onChange={v=>sf('fonction',v)} />
               <Field label="Date d'embauche" value={form.date_embauche} type="date" onChange={v=>sf('date_embauche',v)} />
-              <Field label="Salaire (USD)" value={form.salaire} type="number" onChange={v=>sf('salaire',v)} />
-              <Field label="Prime (USD)" value={form.prime} type="number" onChange={v=>sf('prime',v)} />
+              <Field label="Salaire" value={form.salaire} type="number" onChange={v=>sf('salaire',v)} />
+              <Field label="Prime" value={form.prime} type="number" onChange={v=>sf('prime',v)} />
               <Field label="Statut">
                 <select value={form.status} onChange={e=>sf('status',e.target.value)}>
                   <option value="actif">Actif</option>
@@ -345,7 +345,7 @@ export default function AgentsPage({ profile }) {
                       <td>{a.sexe}</td>
                       <td>{a.grade||'—'}</td>
                       <td>{a.fonction||'—'}</td>
-                      <td style={{fontWeight:600,color:'var(--green-dark)'}}>${a.salaire||0}</td>
+                      <td style={{fontWeight:600,color:'var(--green-dark)'}}>{a.salaire||0}</td>
                       <td><span className={`badge ${STATUS_BADGE[a.status]||'badge-gray'}`}>{a.status}</span></td>
                       <td>
                         <div style={{display:'flex',gap:6}}>
@@ -387,7 +387,7 @@ export default function AgentsPage({ profile }) {
                 </div>
                 <div style={{display:'flex',flexWrap:'wrap',gap:8,fontSize:13,color:'var(--text-secondary)'}}>
                   {a.matricule && <span>🪪 {a.matricule}</span>}
-                  {a.salaire   && <span>💵 ${a.salaire}</span>}
+                  {a.salaire   && <span>💵 {a.salaire}</span>}
                   {a.telephone && <span>📞 {a.telephone}</span>}
                 </div>
                 <div className="agent-card-mobile-actions">
