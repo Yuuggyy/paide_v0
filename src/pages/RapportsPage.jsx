@@ -26,7 +26,7 @@ export default function RapportsPage({ profile }) {
   const isNational = profile?.role === 'national';
   const isCentre   = profile?.role === 'centre';
   const canManage  = isNational || isCentre;
-  const effectiveCentre = isCentre ? (profile?.centre_id || '') : selCentre;
+  const effectiveCentre = isCentre ? (profile?.centre_id || null) : (selCentre || null);
 
   useEffect(() => {
     if (isNational) getCentres().then(({data}) => setCentres(data||[]));

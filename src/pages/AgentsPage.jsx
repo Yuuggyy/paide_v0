@@ -83,8 +83,8 @@ export default function AgentsPage({ profile }) {
     setError(''); setSuccess('');
 
     // Vérification centre_id valide avant envoi
-    if (!effectiveCentre) {
-      return setError('Aucun centre associé. Sélectionnez un centre d\'abord.');
+    if (isNational && !effectiveCentre) {
+      return setError('Sélectionnez un centre d\'abord.');
     }
 
     const payload = {
@@ -139,7 +139,11 @@ export default function AgentsPage({ profile }) {
   };
 
   const openForm = () => {
-    if (!effectiveCentre) { setError('Sélectionnez d\'abord un centre.'); return; }
+    if (isNational && !effectiveCentre) { setError('Sélectionnez d\'abord un centre.'); return; }
+    setError(''); setShowForm(true); setEditing(null);
+  }
+    setError(''); setShowForm(true); setEditing(null); setForm(EMPTY); setPendingFiles([]);
+  }
     setError(''); setShowForm(true); setEditing(null); setForm(EMPTY); setPendingFiles([]);
   };
 
