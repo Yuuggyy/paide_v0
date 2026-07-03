@@ -176,6 +176,21 @@ export const createRapport = async (rapport) => {
   return { data, error };
 };
 
+export const updateRapport = async (id, updates) => {
+  const { data, error } = await supabase
+    .from('rapports_agents')
+    .update(updates)
+    .eq('id', id)
+    .select()
+    .single();
+  return { data, error };
+};
+
+export const deleteRapport = async (id) => {
+  const { error } = await supabase.from('rapports_agents').delete().eq('id', id);
+  return { error };
+};
+
 // ==================== CALENDRIER ====================
 export const getCalendrierByCentre = async (centreId) => {
   const { data, error } = await supabase

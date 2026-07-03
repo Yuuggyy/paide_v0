@@ -10,6 +10,7 @@ import RapportsPage from './pages/RapportsPage';
 import ParametresPage from './pages/ParametresPage';
 import CoordinationPage from './pages/CoordinationPage';
 import SousCoordinationPage from './pages/SousCoordinationPage';
+import InstallPWAButton from './components/InstallPWAButton';
 
 function Footer() {
   return (
@@ -106,7 +107,12 @@ export default function App() {
     </div>
   );
 
-  if (!user) return <LoginPage onLogin={handleLogin} />;
+  if (!user) return (
+    <>
+      <LoginPage onLogin={handleLogin} />
+      <InstallPWAButton />
+    </>
+  );
 
   const pages = {
     centres:           <CentresPage profile={profile} />,
@@ -134,6 +140,7 @@ export default function App() {
         </div>
         <Footer />
       </main>
+      <InstallPWAButton />
     </div>
   );
 }

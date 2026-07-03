@@ -4,11 +4,12 @@
   "description": "Programme d'Appui aux Initiatives de Développement de l'Enfant",
   "start_url": "/",
   "display": "standalone",
-  "orientation": "portrait-primary",
+  "orientation": "any",
   "background_color": "#0d1b2a",
   "theme_color": "#008fb5",
   "scope": "/",
   "lang": "fr",
+  "categories": ["productivity", "business"],
   "icons": [
     {
       "src": "/logo_paide.jpg",
@@ -23,14 +24,6 @@
       "purpose": "any maskable"
     }
   ],
-  "categories": ["education", "productivity"],
-  "shortcuts": [
-    {
-      "name": "Centres",
-      "short_name": "Centres",
-      "description": "Gérer les centres PAIDE",
-      "url": "/",
-      "icons": [{ "src": "/logo_paide.jpg", "sizes": "96x96" }]
-    }
-  ]
+  "screenshots": [],
+  "prefer_related_applications": false
 }
