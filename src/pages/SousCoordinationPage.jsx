@@ -1,25 +1,37 @@
 import { useState, useEffect } from 'react';
 import { createUserWithLogin } from '../lib/adminApi';
 import { supabase } from '../lib/supabaseClient';
+import { getSousCoordinations, getCoordinations } from '../lib/api';
+import SousCoordDetail from '../components/hierarchy/SousCoordDetail';
+
+const normalize = (s) => (s || '').toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
 export default function SousCoordinationPage({ profile }) {
-  const [sousCoord, setSousCoord] = useState([]);
+  const [sousCoord, setSousCoord]   = useState([]);
   const [coordinations, setCoordinations] = useState([]);
-  const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ nom: '', zone: '', coordination_id: '', login_email: '', login_password: '', login_nom: '' });
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+  const [showForm, setShowForm]     = useState(false);
+  const [form, setForm]             = useState({ nom: '', zone: '', coordination_id: '', login_email: '', login_password: '', login_nom: '' });
+  const [error, setError]           = useState('');
+  const [success, setSuccess]       = useState('');
+  const [search, setSearch]         = useState('');
+  const [selected, setSelected]     = useState(null);
 
-  const isNational = profile?.role === 'national';
+  const isNational        = profile?.role === 'national';
+  const isSousCoordination = profile?.role === 'sous_coordination';
 
   useEffect(() => {
     loadSousCoord();
-    supabase.from('coordinations').select('*').then(({ data }) => setCoordinations(data || []));
+    getCoordinations().then(({ data }) => setCoordinations(data || []));
   }, []);
 
   const loadSousCoord = async () => {
-    const { data } = await supabase.from('sous_coordinations').select('*, coordinations(nom)').order('nom');
+    const { data } = await getSousCoordinations();
     setSousCoord(data || []);
+    // Un profil "sous_coordination" atterrit directement sur SA propre sous-coordination
+    if (isSousCoordination && profile?.sous_coordination_id) {
+      const mine = (data || []).find(sc => sc.id === profile.sous_coordination_id);
+      if (mine) setSelected(mine);
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -51,115 +63,138 @@ export default function SousCoordinationPage({ profile }) {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm('Supprimer cette sous-coordination ?')) return;
+    if (!window.confirm('Supprimer cette sous-coordination ? Les centres liés perdront leur rattachement.')) return;
     await supabase.from('sous_coordinations').delete().eq('id', id);
     loadSousCoord();
   };
 
+  if (selected) {
+    return (
+      <div className="page-wrapper">
+        <SousCoordDetail sousCoord={selected} onBack={isNational || (!isSousCoordination) ? () => setSelected(null) : null} />
+      </div>
+    );
+  }
+
+  const q = normalize(search);
+  const filtered = q
+    ? sousCoord.filter(sc => normalize(sc.nom).includes(q) || normalize(sc.zone).includes(q) || normalize(sc.coordinations?.nom).includes(q))
+    : sousCoord;
+
   return (
-    <div style={styles.container}>
-      <div style={styles.header}>
+    <div className="page-wrapper">
+      <div className="page-header">
         <div>
-          <h2 style={styles.title}>📌 Sous-Coordinations Provinciales</h2>
-          <p style={styles.subtitle}>{sousCoord.length} sous-coordination(s)</p>
+          <h1 className="page-title">📌 Sous-Coordinations Provinciales</h1>
+          <p className="page-subtitle">{sousCoord.length} sous-coordination(s)</p>
         </div>
         {isNational && (
-          <button onClick={() => setShowForm(true)} style={styles.btnPrimary}>+ Nouvelle Sous-Coordination</button>
+          <button className="btn btn-teal" onClick={() => setShowForm(true)}>+ Nouvelle Sous-Coordination</button>
         )}
       </div>
 
-      <div style={styles.banner}>
-        🚧 Module en construction — Fonctionnalités complètes disponibles en V1
+      {isSousCoordination && !profile?.sous_coordination_id && (
+        <div className="alert alert-error" style={{ marginBottom: 16 }}>
+          ⚠️ Votre compte n'est rattaché à aucune sous-coordination. Contactez la direction nationale.
+        </div>
+      )}
+
+      {success && <div className="alert alert-success" style={{ marginBottom: 16 }}>✅ {success}</div>}
+      {error && <div className="alert alert-error" style={{ marginBottom: 16 }}>⚠️ {error}</div>}
+
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 8,
+        background: '#fff', border: '1.5px solid var(--border)',
+        borderRadius: 10, padding: '10px 14px', marginBottom: 20, maxWidth: 420,
+      }}>
+        <span style={{ fontSize: 15, opacity: 0.5 }}>🔎</span>
+        <input
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Rechercher une sous-coordination…"
+          style={{ flex: 1, border: 'none', outline: 'none', fontSize: 14, background: 'transparent' }}
+        />
+        {search && (
+          <button onClick={() => setSearch('')} style={{ border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 15, opacity: 0.5 }}>✕</button>
+        )}
       </div>
 
-      {success && <div style={styles.success}>✅ {success}</div>}
-      {error && <div style={styles.error}>❌ {error}</div>}
-
       {showForm && isNational && (
-        <div style={styles.formCard}>
-          <h3 style={styles.formTitle}>Nouvelle Sous-Coordination</h3>
+        <div className="form-card">
+          <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 4 }}>Nouvelle Sous-Coordination</h3>
           <form onSubmit={handleSubmit}>
-            <div style={styles.grid2}>
-              <Field label="Nom *" value={form.nom} onChange={v => setForm({...form, nom: v})} required />
-              <Field label="Zone / Territoire" value={form.zone} onChange={v => setForm({...form, zone: v})} />
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                <label style={{ fontSize: '13px', fontWeight: '600', color: '#374151' }}>Coordination parente</label>
-                <select value={form.coordination_id} onChange={e => setForm({...form, coordination_id: e.target.value})}
-                  style={{ padding: '10px 12px', borderRadius: '8px', border: '1.5px solid #d1d5db', fontSize: '14px' }}>
-                  <option value="">-- Aucune --</option>
+            <div className="form-grid">
+              <div className="form-field">
+                <label className="form-label">Nom *</label>
+                <input value={form.nom} onChange={e => setForm({ ...form, nom: e.target.value })} required />
+              </div>
+              <div className="form-field">
+                <label className="form-label">Zone / Territoire</label>
+                <input value={form.zone} onChange={e => setForm({ ...form, zone: e.target.value })} />
+              </div>
+              <div className="form-field">
+                <label className="form-label">Coordination parente *</label>
+                <select value={form.coordination_id} onChange={e => setForm({ ...form, coordination_id: e.target.value })} required>
+                  <option value="">-- Choisir --</option>
                   {coordinations.map(c => <option key={c.id} value={c.id}>{c.nom}</option>)}
                 </select>
               </div>
             </div>
-            <div style={styles.sectionTitle}>🔐 Login du Sous-Coordinateur</div>
-            <div style={styles.grid2}>
-              <Field label="Nom complet" value={form.login_nom} onChange={v => setForm({...form, login_nom: v})} />
-              <Field label="Email de connexion" value={form.login_email} type="email" onChange={v => setForm({...form, login_email: v})} />
-              <Field label="Mot de passe (min. 8 car.)" value={form.login_password} type="password" onChange={v => setForm({...form, login_password: v})} />
+            <div className="form-section">🔐 Login du Sous-Coordinateur</div>
+            <div className="form-grid">
+              <div className="form-field">
+                <label className="form-label">Nom complet</label>
+                <input value={form.login_nom} onChange={e => setForm({ ...form, login_nom: e.target.value })} />
+              </div>
+              <div className="form-field">
+                <label className="form-label">Email de connexion</label>
+                <input type="email" value={form.login_email} onChange={e => setForm({ ...form, login_email: e.target.value })} />
+              </div>
+              <div className="form-field">
+                <label className="form-label">Mot de passe (min. 8 car.)</label>
+                <input type="password" value={form.login_password} onChange={e => setForm({ ...form, login_password: e.target.value })} />
+              </div>
             </div>
-            <div style={styles.formActions}>
-              <button type="button" onClick={() => setShowForm(false)} style={styles.btnSecondary}>Annuler</button>
-              <button type="submit" style={styles.btnPrimary}>Créer</button>
+            <div className="form-actions">
+              <button type="button" className="btn btn-ghost" onClick={() => setShowForm(false)}>Annuler</button>
+              <button type="submit" className="btn btn-teal">Créer</button>
             </div>
           </form>
         </div>
       )}
 
-      <div style={styles.grid}>
-        {sousCoord.map(sc => (
-          <div key={sc.id} style={styles.card}>
-            <div style={styles.cardHeader}>
-              <span style={styles.cardIcon}>📌</span>
-              <div style={{ flex: 1 }}>
-                <h3 style={styles.cardTitle}>{sc.nom}</h3>
-                {sc.zone && <p style={styles.cardSub}>📍 {sc.zone}</p>}
-                {sc.coordinations?.nom && <p style={styles.cardSub}>🗂️ {sc.coordinations.nom}</p>}
+      {filtered.length === 0 ? (
+        <div className="empty-state">
+          <div className="emoji">📌</div>
+          <h3>{search ? `Aucun résultat pour "${search}"` : 'Aucune sous-coordination créée.'}</h3>
+        </div>
+      ) : (
+        <div className="cards-grid">
+          {filtered.map(sc => (
+            <div key={sc.id} className="card" style={{ padding: '16px 18px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }} onClick={() => setSelected(sc)}>
+                <span style={{ fontSize: 22 }}>📌</span>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)' }}>{sc.nom}</div>
+                  {sc.zone && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>📍 {sc.zone}</div>}
+                  {sc.coordinations?.nom && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>🗂️ {sc.coordinations.nom}</div>}
+                </div>
+                <span style={{ fontSize: 16, opacity: 0.4 }}>›</span>
               </div>
               {isNational && (
-                <button onClick={() => handleDelete(sc.id)} style={styles.btnDelete}>🗑️</button>
+                <div style={{ display: 'flex', gap: 8, paddingTop: 12, marginTop: 12, borderTop: '1px solid var(--border)' }}>
+                  <button className="btn btn-ghost" style={{ flex: 1, padding: '8px', fontSize: 13 }} onClick={() => setSelected(sc)}>
+                    👁️ Voir le détail
+                  </button>
+                  <button className="btn btn-danger" style={{ flex: 1, padding: '8px', fontSize: 13 }} onClick={() => handleDelete(sc.id)}>
+                    🗑️ Supprimer
+                  </button>
+                </div>
               )}
             </div>
-          </div>
-        ))}
-        {sousCoord.length === 0 && (
-          <p style={styles.empty}>Aucune sous-coordination créée.</p>
-        )}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
-
-function Field({ label, value, onChange, type = 'text', required }) {
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-      <label style={{ fontSize: '13px', fontWeight: '600', color: '#374151' }}>{label}</label>
-      <input type={type} value={value || ''} onChange={e => onChange(e.target.value)} required={required}
-        style={{ padding: '10px 12px', borderRadius: '8px', border: '1.5px solid #d1d5db', fontSize: '14px' }} />
-    </div>
-  );
-}
-
-const styles = {
-  container: { padding: '32px', fontFamily: "'Segoe UI', sans-serif" },
-  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' },
-  title: { fontSize: '24px', fontWeight: '700', color: '#1a3a5c', margin: 0 },
-  subtitle: { fontSize: '14px', color: '#6c757d', marginTop: '4px' },
-  banner: { background: '#fef9c3', border: '1px solid #fde68a', color: '#854d0e', padding: '12px 16px', borderRadius: '8px', marginBottom: '20px', fontSize: '14px', fontWeight: '600' },
-  sectionTitle: { fontSize: '14px', fontWeight: '700', color: '#1a3a5c', padding: '12px 0 8px', borderBottom: '2px solid #e5e7eb', marginBottom: '12px', marginTop: '16px' },
-  grid2: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '8px' },
-  formCard: { background: '#fff', borderRadius: '12px', padding: '24px', marginBottom: '24px', border: '1px solid #e5e7eb', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' },
-  formTitle: { fontSize: '18px', fontWeight: '700', color: '#1a3a5c', marginBottom: '16px' },
-  formActions: { display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '20px' },
-  grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px' },
-  card: { background: '#fff', borderRadius: '12px', border: '1px solid #e5e7eb', overflow: 'hidden' },
-  cardHeader: { display: 'flex', alignItems: 'center', gap: '12px', padding: '16px 20px' },
-  cardIcon: { fontSize: '24px' },
-  cardTitle: { fontSize: '16px', fontWeight: '700', color: '#1a3a5c', margin: 0 },
-  cardSub: { fontSize: '13px', color: '#6c757d', margin: '2px 0 0' },
-  btnPrimary: { background: '#1a3a5c', color: '#fff', border: 'none', padding: '10px 20px', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: '600' },
-  btnSecondary: { background: '#f1f5f9', color: '#374151', border: '1px solid #d1d5db', padding: '10px 20px', borderRadius: '8px', cursor: 'pointer', fontSize: '14px' },
-  btnDelete: { background: '#fef2f2', color: '#dc2626', border: 'none', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '13px' },
-  success: { background: '#dcfce7', color: '#166534', padding: '10px 14px', borderRadius: '8px', fontSize: '13px', marginBottom: '16px' },
-  error: { background: '#fee2e2', color: '#dc2626', padding: '10px 14px', borderRadius: '8px', fontSize: '13px', marginBottom: '16px' },
-  empty: { color: '#9ca3af', fontStyle: 'italic', padding: '20px', textAlign: 'center' },
-};

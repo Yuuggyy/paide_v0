@@ -41,18 +41,20 @@ export default function AgentsPage({ profile }) {
   const isNational = profile?.role === 'national';
   const isCentre   = profile?.role === 'centre';
   const canManage  = isNational || isCentre;
+  // coordination/sous_coordination : lecture seule, mais peuvent choisir un centre parmi les leurs (RLS scope deja)
+  const canPickCentre = isNational || profile?.role === 'coordination' || profile?.role === 'sous_coordination';
   // centre_id toujours valide — jamais de chaîne vide
   const effectiveCentre = isCentre
     ? (profile?.centre_id || null)
     : (selCentre || null);
 
   useEffect(() => {
-    if (isNational) getCentres().then(({data}) => setCentres(data||[]));
+    if (canPickCentre) getCentres().then(({data}) => setCentres(data||[]));
     if (effectiveCentre) load(effectiveCentre);
   }, []);
 
   useEffect(() => {
-    if (isNational && selCentre) load(selCentre);
+    if (canPickCentre && selCentre) load(selCentre);
   }, [selCentre]);
 
   const load = async (cId) => {
@@ -177,8 +179,8 @@ export default function AgentsPage({ profile }) {
       {success && <div className="alert alert-success">✅ {success}</div>}
       {error   && <div className="alert alert-error">⚠️ {error}</div>}
 
-      {/* ── Filtre centre (national uniquement) ── */}
-      {isNational && (
+      {/* ── Filtre centre (national, coordination, sous-coordination) ── */}
+      {canPickCentre && (
         <div className="filter-bar">
           <label className="form-label" style={{whiteSpace:'nowrap'}}>🏛️ Centre :</label>
           <select value={selCentre} onChange={e=>setSelCentre(e.target.value)} style={{maxWidth:320}}>
@@ -318,7 +320,7 @@ export default function AgentsPage({ profile }) {
       )}
 
       {/* ── Contenu principal ── */}
-      {(!effectiveCentre && isNational) ? (
+      {(!effectiveCentre && canPickCentre) ? (
         <div className="empty-state">
           <div className="emoji">🏛️</div>
           <h3>Sélectionnez un centre</h3>

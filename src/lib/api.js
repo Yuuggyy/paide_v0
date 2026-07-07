@@ -4,7 +4,7 @@ import { supabase } from './supabaseClient';
 export const getCentres = async () => {
   const { data, error } = await supabase
     .from('centres')
-    .select('*')
+    .select('*, sous_coordinations(nom, coordinations(nom))')
     .order('name');
   return { data, error };
 };
@@ -42,6 +42,47 @@ export const updateCentre = async (id, updates) => {
 export const deleteCentre = async (id) => {
   const { error } = await supabase.from('centres').delete().eq('id', id);
   return { error };
+};
+
+// ==================== HIÉRARCHIE : COORDINATIONS / SOUS-COORDINATIONS ====================
+export const getCoordinations = async () => {
+  const { data, error } = await supabase.from('coordinations').select('*').order('nom');
+  return { data, error };
+};
+
+export const getSousCoordinations = async (coordinationId) => {
+  let q = supabase.from('sous_coordinations').select('*, coordinations(id, nom)').order('nom');
+  if (coordinationId) q = q.eq('coordination_id', coordinationId);
+  const { data, error } = await q;
+  return { data, error };
+};
+
+export const getCentresBySousCoordination = async (sousCoordinationId) => {
+  const { data, error } = await supabase
+    .from('centres')
+    .select('*')
+    .eq('sous_coordination_id', sousCoordinationId)
+    .order('name');
+  return { data, error };
+};
+
+export const getCentresByCoordination = async (coordinationId) => {
+  const { data, error } = await supabase
+    .from('centres')
+    .select('*, sous_coordinations!inner(nom, coordination_id)')
+    .eq('sous_coordinations.coordination_id', coordinationId)
+    .order('name');
+  return { data, error };
+};
+
+export const getAgentsByCentreIds = async (centreIds) => {
+  if (!centreIds || centreIds.length === 0) return { data: [], error: null };
+  const { data, error } = await supabase
+    .from('agents')
+    .select('*, centres(name)')
+    .in('centre_id', centreIds)
+    .order('noms');
+  return { data, error };
 };
 
 // ==================== AGENTS ====================

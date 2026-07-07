@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getCentres, createCentre, updateCentre, deleteCentre } from '../lib/api';
+import { getCentres, createCentre, updateCentre, deleteCentre, getSousCoordinations } from '../lib/api';
 import { createUserWithLogin, deleteUsersOfCentre, resetUserPassword } from '../lib/adminApi';
 
 function Field({ label, value, onChange, type = 'text', required, span, children }) {
@@ -32,14 +32,18 @@ export default function CentresPage({ profile }) {
 
   const [form, setForm] = useState({
     name: '', lieu_affectation: '', province: '', adresse: '',
-    telephone: '', email_centre: '',
+    telephone: '', email_centre: '', sous_coordination_id: '',
     login_email: '', login_password: '', login_nom: '',
   });
+  const [sousCoords, setSousCoords] = useState([]);
 
   const isNational = profile?.role === 'national';
   const isCentre   = profile?.role === 'centre';
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    if (isNational) getSousCoordinations().then(({ data }) => setSousCoords(data || []));
+  }, []);
 
   /* ── Charger les centres ── */
   const load = async () => {
@@ -60,7 +64,7 @@ export default function CentresPage({ profile }) {
 
   const resetForm = () => setForm({
     name: '', lieu_affectation: '', province: '', adresse: '',
-    telephone: '', email_centre: '',
+    telephone: '', email_centre: '', sous_coordination_id: '',
     login_email: '', login_password: '', login_nom: '',
   });
   const sf = (k, v) => setForm(f => ({ ...f, [k]: v }));
@@ -79,6 +83,7 @@ export default function CentresPage({ profile }) {
         adresse: form.adresse,
         telephone: form.telephone,
         email: form.email_centre,
+        sous_coordination_id: form.sous_coordination_id || null,
       });
       if (updErr) return setError('Erreur mise à jour : ' + updErr.message);
       setSuccess('Centre mis à jour avec succès !');
@@ -92,6 +97,7 @@ export default function CentresPage({ profile }) {
         adresse: form.adresse,
         telephone: form.telephone,
         email: form.email_centre,
+        sous_coordination_id: form.sous_coordination_id || null,
       });
       if (createErr) return setError('Erreur création : ' + createErr.message);
 
@@ -161,6 +167,7 @@ export default function CentresPage({ profile }) {
       adresse: c.adresse || '',
       telephone: c.telephone || '',
       email_centre: c.email || '',
+      sous_coordination_id: c.sous_coordination_id || '',
       login_email: '', login_password: '', login_nom: '',
     });
     setShowForm(true);
@@ -290,6 +297,19 @@ export default function CentresPage({ profile }) {
               <Field label="Téléphone" value={form.telephone} onChange={v => sf('telephone', v)} />
               <Field label="Email du Centre" value={form.email_centre} type="email" onChange={v => sf('email_centre', v)} />
               <Field label="Adresse complète" value={form.adresse} onChange={v => sf('adresse', v)} />
+              {isNational && (
+                <div className="form-field">
+                  <label className="form-label">Sous-coordination *</label>
+                  <select value={form.sous_coordination_id} onChange={e => sf('sous_coordination_id', e.target.value)} required>
+                    <option value="">-- Choisir --</option>
+                    {sousCoords.map(sc => (
+                      <option key={sc.id} value={sc.id}>
+                        {sc.coordinations?.nom ? `${sc.coordinations.nom} — ${sc.nom}` : sc.nom}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
 
             {/* Login — seulement à la création, seulement par le national */}
@@ -392,6 +412,15 @@ export default function CentresPage({ profile }) {
                 {centre.province && (
                   <div style={{ fontSize: 13, color: 'var(--text-secondary)', display: 'flex', gap: 6 }}>
                     <span>🌍</span><span>{centre.province}</span>
+                  </div>
+                )}
+                {centre.sous_coordinations?.nom ? (
+                  <div style={{ fontSize: 13, color: 'var(--text-secondary)', display: 'flex', gap: 6 }}>
+                    <span>📌</span><span>{centre.sous_coordinations.coordinations?.nom ? `${centre.sous_coordinations.coordinations.nom} — ` : ''}{centre.sous_coordinations.nom}</span>
+                  </div>
+                ) : isNational && (
+                  <div style={{ fontSize: 12, color: '#dc2626', display: 'flex', gap: 6 }}>
+                    <span>⚠️</span><span>Non rattaché à une sous-coordination</span>
                   </div>
                 )}
                 {centre.telephone && (

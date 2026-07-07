@@ -51,8 +51,10 @@ export default function Sidebar({ currentPage, onNavigate, user, profile, onLogo
   const visible = NAV.filter(item => {
     if (role === 'centre')
       return ['centres','agents','filieres','calendrier','rapports','parametres'].includes(item.key);
-    if (role === 'coordination' || role === 'sous_coordination')
-      return ['centres','agents','rapports','parametres'].includes(item.key);
+    if (role === 'coordination')
+      return ['coordination','agents','rapports','parametres'].includes(item.key);
+    if (role === 'sous_coordination')
+      return ['sous_coordination','agents','rapports','parametres'].includes(item.key);
     return true;
   });
 

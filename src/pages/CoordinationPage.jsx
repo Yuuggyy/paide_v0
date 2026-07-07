@@ -1,21 +1,164 @@
 import { useState, useEffect } from 'react';
 import { createUserWithLogin } from '../lib/adminApi';
 import { supabase } from '../lib/supabaseClient';
+import { getCoordinations, getSousCoordinations, getCentresByCoordination, getAgentsByCentreIds } from '../lib/api';
+import SousCoordDetail from '../components/hierarchy/SousCoordDetail';
 
+const normalize = (s) => (s || '').toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+/* ══════════════════════════════════════
+   NIVEAU 2 — Détail d'une coordination :
+   ses agents (agrégés) + la barre de ses sous-coordinations
+══════════════════════════════════════ */
+function CoordinationDetail({ coord, onBack, isNational }) {
+  const [sousCoords, setSousCoords] = useState([]);
+  const [agents, setAgents]         = useState([]);
+  const [loading, setLoading]       = useState(true);
+  const [search, setSearch]         = useState('');
+  const [selectedSousCoord, setSelectedSousCoord] = useState(null);
+
+  useEffect(() => { load(); }, [coord?.id]);
+
+  const load = async () => {
+    if (!coord?.id) return;
+    setLoading(true);
+    const { data: sc } = await getSousCoordinations(coord.id);
+    setSousCoords(sc || []);
+    const { data: centresData } = await getCentresByCoordination(coord.id);
+    const { data: agentsData } = await getAgentsByCentreIds((centresData || []).map(c => c.id));
+    setAgents(agentsData || []);
+    setLoading(false);
+  };
+
+  if (selectedSousCoord) {
+    return <SousCoordDetail sousCoord={selectedSousCoord} onBack={() => setSelectedSousCoord(null)} />;
+  }
+
+  const q = normalize(search);
+  const filteredSousCoords = q ? sousCoords.filter(sc => normalize(sc.nom).includes(q) || normalize(sc.zone).includes(q)) : sousCoords;
+  const filteredAgents = q ? agents.filter(a => normalize(a.noms).includes(q) || normalize(a.fonction).includes(q)) : agents;
+
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+        {onBack && (
+          <button className="btn btn-ghost" style={{ padding: '8px 14px' }} onClick={onBack}>← Retour</button>
+        )}
+        <div>
+          <h2 style={{ fontSize: 19, fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
+            🗂️ {coord?.nom}
+          </h2>
+          {coord?.province && <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: '2px 0 0' }}>📍 {coord.province}</p>}
+        </div>
+      </div>
+
+      <div className="stat-grid" style={{ marginBottom: 16 }}>
+        <div className="stat-card">
+          <div className="stat-icon stat-icon-orange">📌</div>
+          <div>
+            <div className="stat-value">{sousCoords.length}</div>
+            <div className="stat-label">Sous-coordinations</div>
+          </div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-icon stat-icon-green">👥</div>
+          <div>
+            <div className="stat-value">{agents.length}</div>
+            <div className="stat-label">Agents (total)</div>
+          </div>
+        </div>
+      </div>
+
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 8,
+        background: '#fff', border: '1.5px solid var(--border)',
+        borderRadius: 10, padding: '10px 14px', marginBottom: 20, maxWidth: 420,
+      }}>
+        <span style={{ fontSize: 15, opacity: 0.5 }}>🔎</span>
+        <input
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Rechercher une sous-coordination ou un agent…"
+          style={{ flex: 1, border: 'none', outline: 'none', fontSize: 14, background: 'transparent' }}
+        />
+        {search && (
+          <button onClick={() => setSearch('')} style={{ border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 15, opacity: 0.5 }}>✕</button>
+        )}
+      </div>
+
+      {loading ? (
+        <div className="loading-center"><div className="spinner" /><p>Chargement…</p></div>
+      ) : (
+        <>
+          <h3 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 10 }}>
+            👥 Agents de la coordination ({filteredAgents.length})
+          </h3>
+          {filteredAgents.length === 0 ? (
+            <p style={{ color: 'var(--text-muted)', fontSize: 13, marginBottom: 24 }}>Aucun agent trouvé.</p>
+          ) : (
+            <div className="cards-grid" style={{ marginBottom: 28 }}>
+              {filteredAgents.map(a => (
+                <div key={a.id} className="card" style={{ padding: '14px 16px' }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>{a.noms}</div>
+                  {a.fonction && <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>{a.fonction}</div>}
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>🏛️ {a.centres?.name || '—'}</div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <h3 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 10 }}>
+            📌 Sous-coordinations ({filteredSousCoords.length})
+          </h3>
+          {filteredSousCoords.length === 0 ? (
+            <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>Aucune sous-coordination pour le moment.</p>
+          ) : (
+            <div className="cards-grid">
+              {filteredSousCoords.map(sc => (
+                <div key={sc.id} className="card" style={{ padding: '16px 18px', cursor: 'pointer' }} onClick={() => setSelectedSousCoord(sc)}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <span style={{ fontSize: 22 }}>📌</span>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>{sc.nom}</div>
+                      {sc.zone && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>📍 {sc.zone}</div>}
+                    </div>
+                    <span style={{ fontSize: 16, opacity: 0.4 }}>›</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════
+   NIVEAU 1 — Page principale
+══════════════════════════════════════ */
 export default function CoordinationPage({ profile }) {
   const [coordinations, setCoordinations] = useState([]);
-  const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ nom: '', province: '', login_email: '', login_password: '', login_nom: '' });
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+  const [showForm, setShowForm]     = useState(false);
+  const [form, setForm]             = useState({ nom: '', province: '', login_email: '', login_password: '', login_nom: '' });
+  const [error, setError]           = useState('');
+  const [success, setSuccess]       = useState('');
+  const [search, setSearch]         = useState('');
+  const [selectedCoord, setSelectedCoord] = useState(null);
 
-  const isNational = profile?.role === 'national';
+  const isNational     = profile?.role === 'national';
+  const isCoordination  = profile?.role === 'coordination';
 
   useEffect(() => { loadCoordinations(); }, []);
 
   const loadCoordinations = async () => {
-    const { data } = await supabase.from('coordinations').select('*').order('nom');
+    const { data } = await getCoordinations();
     setCoordinations(data || []);
+    // Un profil "coordination" atterrit directement sur SA coordination
+    if (isCoordination && profile?.coordination_id) {
+      const mine = (data || []).find(c => c.id === profile.coordination_id);
+      if (mine) setSelectedCoord(mine);
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -47,107 +190,136 @@ export default function CoordinationPage({ profile }) {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm('Supprimer cette coordination ?')) return;
+    if (!window.confirm('Supprimer cette coordination ? Les sous-coordinations et centres liés perdront leur rattachement.')) return;
     await supabase.from('coordinations').delete().eq('id', id);
     loadCoordinations();
   };
 
+  // Profil "coordination" (ou national ayant sélectionné une coordination) → vue détail directe
+  if (selectedCoord) {
+    return (
+      <div className="page-wrapper">
+        <CoordinationDetail
+          coord={selectedCoord}
+          isNational={isNational}
+          onBack={isNational ? () => setSelectedCoord(null) : null}
+        />
+      </div>
+    );
+  }
+
+  // Sinon (national sans sélection, ou coordination sans coordination_id assigné) → liste
+  const q = normalize(search);
+  const filteredCoordinations = q ? coordinations.filter(c => normalize(c.nom).includes(q) || normalize(c.province).includes(q)) : coordinations;
+
   return (
-    <div style={styles.container}>
-      <div style={styles.header}>
+    <div className="page-wrapper">
+      <div className="page-header">
         <div>
-          <h2 style={styles.title}>🗂️ Coordinations Provinciales</h2>
-          <p style={styles.subtitle}>{coordinations.length} coordination(s)</p>
+          <h1 className="page-title">🗂️ Coordinations Provinciales</h1>
+          <p className="page-subtitle">{coordinations.length} coordination(s)</p>
         </div>
         {isNational && (
-          <button onClick={() => setShowForm(true)} style={styles.btnPrimary}>+ Nouvelle Coordination</button>
+          <button className="btn btn-teal" onClick={() => setShowForm(true)}>+ Nouvelle Coordination</button>
         )}
       </div>
 
-      {/* Bannière "en construction" */}
-      <div style={styles.banner}>
-        🚧 Module en construction — Fonctionnalités complètes disponibles en V1
-      </div>
+      {isCoordination && !profile?.coordination_id && (
+        <div className="alert alert-error" style={{ marginBottom: 16 }}>
+          ⚠️ Votre compte n'est rattaché à aucune coordination. Contactez la direction nationale.
+        </div>
+      )}
 
-      {success && <div style={styles.success}>✅ {success}</div>}
-      {error && <div style={styles.error}>❌ {error}</div>}
+      {success && <div className="alert alert-success" style={{ marginBottom: 16 }}>✅ {success}</div>}
+      {error && <div className="alert alert-error" style={{ marginBottom: 16 }}>⚠️ {error}</div>}
+
+      {isNational && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          background: '#fff', border: '1.5px solid var(--border)',
+          borderRadius: 10, padding: '10px 14px', marginBottom: 20, maxWidth: 420,
+        }}>
+          <span style={{ fontSize: 15, opacity: 0.5 }}>🔎</span>
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Rechercher une coordination…"
+            style={{ flex: 1, border: 'none', outline: 'none', fontSize: 14, background: 'transparent' }}
+          />
+          {search && (
+            <button onClick={() => setSearch('')} style={{ border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 15, opacity: 0.5 }}>✕</button>
+          )}
+        </div>
+      )}
 
       {showForm && isNational && (
-        <div style={styles.formCard}>
-          <h3 style={styles.formTitle}>Nouvelle Coordination Provinciale</h3>
+        <div className="form-card">
+          <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 4 }}>Nouvelle Coordination Provinciale</h3>
           <form onSubmit={handleSubmit}>
-            <div style={styles.grid2}>
-              <Field label="Nom de la Coordination *" value={form.nom} onChange={v => setForm({...form, nom: v})} required />
-              <Field label="Province" value={form.province} onChange={v => setForm({...form, province: v})} />
+            <div className="form-grid">
+              <div className="form-field">
+                <label className="form-label">Nom de la Coordination *</label>
+                <input value={form.nom} onChange={e => setForm({ ...form, nom: e.target.value })} required />
+              </div>
+              <div className="form-field">
+                <label className="form-label">Province</label>
+                <input value={form.province} onChange={e => setForm({ ...form, province: e.target.value })} />
+              </div>
             </div>
-            <div style={styles.sectionTitle}>🔐 Login du Coordinateur</div>
-            <div style={styles.grid2}>
-              <Field label="Nom complet" value={form.login_nom} onChange={v => setForm({...form, login_nom: v})} />
-              <Field label="Email de connexion" value={form.login_email} type="email" onChange={v => setForm({...form, login_email: v})} />
-              <Field label="Mot de passe (min. 8 car.)" value={form.login_password} type="password" onChange={v => setForm({...form, login_password: v})} />
+            <div className="form-section">🔐 Login du Coordinateur</div>
+            <div className="form-grid">
+              <div className="form-field">
+                <label className="form-label">Nom complet</label>
+                <input value={form.login_nom} onChange={e => setForm({ ...form, login_nom: e.target.value })} />
+              </div>
+              <div className="form-field">
+                <label className="form-label">Email de connexion</label>
+                <input type="email" value={form.login_email} onChange={e => setForm({ ...form, login_email: e.target.value })} />
+              </div>
+              <div className="form-field">
+                <label className="form-label">Mot de passe (min. 8 car.)</label>
+                <input type="password" value={form.login_password} onChange={e => setForm({ ...form, login_password: e.target.value })} />
+              </div>
             </div>
-            <div style={styles.formActions}>
-              <button type="button" onClick={() => setShowForm(false)} style={styles.btnSecondary}>Annuler</button>
-              <button type="submit" style={styles.btnPrimary}>Créer</button>
+            <div className="form-actions">
+              <button type="button" className="btn btn-ghost" onClick={() => setShowForm(false)}>Annuler</button>
+              <button type="submit" className="btn btn-teal">Créer</button>
             </div>
           </form>
         </div>
       )}
 
-      <div style={styles.grid}>
-        {coordinations.map(c => (
-          <div key={c.id} style={styles.card}>
-            <div style={styles.cardHeader}>
-              <span style={styles.cardIcon}>🗂️</span>
-              <div style={{ flex: 1 }}>
-                <h3 style={styles.cardTitle}>{c.nom}</h3>
-                {c.province && <p style={styles.cardSub}>📍 {c.province}</p>}
+      {filteredCoordinations.length === 0 ? (
+        <div className="empty-state">
+          <div className="emoji">🗂️</div>
+          <h3>{search ? `Aucun résultat pour "${search}"` : 'Aucune coordination créée pour le moment.'}</h3>
+        </div>
+      ) : (
+        <div className="cards-grid">
+          {filteredCoordinations.map(c => (
+            <div key={c.id} className="card" style={{ padding: '16px 18px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }} onClick={() => setSelectedCoord(c)}>
+                <span style={{ fontSize: 22 }}>🗂️</span>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)' }}>{c.nom}</div>
+                  {c.province && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>📍 {c.province}</div>}
+                </div>
+                <span style={{ fontSize: 16, opacity: 0.4 }}>›</span>
               </div>
               {isNational && (
-                <button onClick={() => handleDelete(c.id)} style={styles.btnDelete}>🗑️</button>
+                <div style={{ display: 'flex', gap: 8, paddingTop: 12, marginTop: 12, borderTop: '1px solid var(--border)' }}>
+                  <button className="btn btn-ghost" style={{ flex: 1, padding: '8px', fontSize: 13 }} onClick={() => setSelectedCoord(c)}>
+                    👁️ Voir le détail
+                  </button>
+                  <button className="btn btn-danger" style={{ flex: 1, padding: '8px', fontSize: 13 }} onClick={() => handleDelete(c.id)}>
+                    🗑️ Supprimer
+                  </button>
+                </div>
               )}
             </div>
-          </div>
-        ))}
-        {coordinations.length === 0 && (
-          <p style={styles.empty}>Aucune coordination créée pour le moment.</p>
-        )}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
-
-function Field({ label, value, onChange, type = 'text', required }) {
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-      <label style={{ fontSize: '13px', fontWeight: '600', color: '#374151' }}>{label}</label>
-      <input type={type} value={value || ''} onChange={e => onChange(e.target.value)} required={required}
-        style={{ padding: '10px 12px', borderRadius: '8px', border: '1.5px solid #d1d5db', fontSize: '14px' }} />
-    </div>
-  );
-}
-
-const styles = {
-  container: { padding: '32px', fontFamily: "'Segoe UI', sans-serif" },
-  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' },
-  title: { fontSize: '24px', fontWeight: '700', color: '#1a3a5c', margin: 0 },
-  subtitle: { fontSize: '14px', color: '#6c757d', marginTop: '4px' },
-  banner: { background: '#fef9c3', border: '1px solid #fde68a', color: '#854d0e', padding: '12px 16px', borderRadius: '8px', marginBottom: '20px', fontSize: '14px', fontWeight: '600' },
-  sectionTitle: { fontSize: '14px', fontWeight: '700', color: '#1a3a5c', padding: '12px 0 8px', borderBottom: '2px solid #e5e7eb', marginBottom: '12px', marginTop: '16px' },
-  grid2: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '8px' },
-  formCard: { background: '#fff', borderRadius: '12px', padding: '24px', marginBottom: '24px', border: '1px solid #e5e7eb', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' },
-  formTitle: { fontSize: '18px', fontWeight: '700', color: '#1a3a5c', marginBottom: '16px' },
-  formActions: { display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '20px' },
-  grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px' },
-  card: { background: '#fff', borderRadius: '12px', border: '1px solid #e5e7eb', overflow: 'hidden' },
-  cardHeader: { display: 'flex', alignItems: 'center', gap: '12px', padding: '16px 20px' },
-  cardIcon: { fontSize: '24px' },
-  cardTitle: { fontSize: '16px', fontWeight: '700', color: '#1a3a5c', margin: 0 },
-  cardSub: { fontSize: '13px', color: '#6c757d', margin: '2px 0 0' },
-  btnPrimary: { background: '#1a3a5c', color: '#fff', border: 'none', padding: '10px 20px', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: '600' },
-  btnSecondary: { background: '#f1f5f9', color: '#374151', border: '1px solid #d1d5db', padding: '10px 20px', borderRadius: '8px', cursor: 'pointer', fontSize: '14px' },
-  btnDelete: { background: '#fef2f2', color: '#dc2626', border: 'none', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '13px' },
-  success: { background: '#dcfce7', color: '#166534', padding: '10px 14px', borderRadius: '8px', fontSize: '13px', marginBottom: '16px' },
-  error: { background: '#fee2e2', color: '#dc2626', padding: '10px 14px', borderRadius: '8px', fontSize: '13px', marginBottom: '16px' },
-  empty: { color: '#9ca3af', fontStyle: 'italic', padding: '20px', textAlign: 'center' },
-};

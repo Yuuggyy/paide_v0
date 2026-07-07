@@ -82,7 +82,8 @@ export default function App() {
     const { data } = await getUserProfile(userId);
     setProfile(data);
     if (data?.role === 'centre') setCurrentPage('agents');
-    else if (data?.role === 'coordination' || data?.role === 'sous_coordination') setCurrentPage('centres');
+    else if (data?.role === 'coordination') setCurrentPage('coordination');
+    else if (data?.role === 'sous_coordination') setCurrentPage('sous_coordination');
     setLoading(false);
   };
 
