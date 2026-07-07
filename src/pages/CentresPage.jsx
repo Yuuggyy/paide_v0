@@ -28,6 +28,7 @@ export default function CentresPage({ profile }) {
   const [newPwd, setNewPwd]       = useState('');
   const [error, setError]         = useState('');
   const [success, setSuccess]     = useState('');
+  const [search, setSearch]       = useState('');
 
   const [form, setForm] = useState({
     name: '', lieu_affectation: '', province: '', adresse: '',
@@ -176,6 +177,15 @@ export default function CentresPage({ profile }) {
     setShowReset(null); setNewPwd(''); setError('');
   };
 
+  /* Recherche insensible accents/majuscules — nom, lieu, province */
+  const normalize = (s) => (s || '').toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const filteredCentres = search.trim()
+    ? centres.filter(c => {
+        const q = normalize(search);
+        return normalize(c.name).includes(q) || normalize(c.lieu_affectation).includes(q) || normalize(c.province).includes(q);
+      })
+    : centres;
+
   /* ══════════════════════════════════════
      RENDER
   ══════════════════════════════════════ */
@@ -227,6 +237,24 @@ export default function CentresPage({ profile }) {
             <div className="stat-label">Provinces</div>
           </div>
         </div>
+      </div>
+
+      {/* ── Barre de recherche ── */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 8,
+        background: '#fff', border: '1.5px solid var(--border, #e2e8f0)',
+        borderRadius: 10, padding: '10px 14px', marginBottom: 16, maxWidth: 420,
+      }}>
+        <span style={{ fontSize: 15, opacity: 0.5 }}>🔎</span>
+        <input
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Rechercher un centre, un lieu, une province…"
+          style={{ flex: 1, border: 'none', outline: 'none', fontSize: 14, background: 'transparent' }}
+        />
+        {search && (
+          <button onClick={() => setSearch('')} style={{ border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 15, opacity: 0.5 }}>✕</button>
+        )}
       </div>
 
       {/* ── Alerts ── */}
@@ -328,9 +356,15 @@ export default function CentresPage({ profile }) {
           <h3>Aucun centre enregistré</h3>
           {isNational && <p>Cliquez sur "+ Nouveau Centre" pour commencer.</p>}
         </div>
+      ) : filteredCentres.length === 0 ? (
+        <div className="empty-state">
+          <div className="emoji">🔍</div>
+          <h3>Aucun résultat pour "{search}"</h3>
+          <p>Essayez un autre nom, lieu ou province.</p>
+        </div>
       ) : (
         <div className="cards-grid">
-          {centres.map(centre => (
+          {filteredCentres.map(centre => (
             <div key={centre.id} className="card" style={{ padding: '18px 20px' }}>
 
               {/* En-tête */}
