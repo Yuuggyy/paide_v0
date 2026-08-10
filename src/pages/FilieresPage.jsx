@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getFilieresByCentre, createFiliere, updateFiliere, deleteFiliere, getCentres } from '../lib/api';
+import { getFilieresByCentre, createFiliere, updateFiliere, deleteFiliere, getCentres , getSousCoordinations } from '../lib/api';
 
 export default function FilieresPage({ profile }) {
   const [filieres, setFilieres]   = useState([]);
@@ -14,11 +14,25 @@ export default function FilieresPage({ profile }) {
 
   const isNational = profile?.role === 'national';
   const isCentre   = profile?.role === 'centre';
-  const canManage  = isNational || isCentre;
+  const canManage  = isNational || isCentre || profile?.role === 'coordination' || profile?.role === 'sous_coordination';
+  const isSousCoord    = profile?.role === 'sous_coordination';
+  const isCoordination = profile?.role === 'coordination';
   const effectiveCentre = isCentre ? (profile?.centre_id || null) : (selCentre || null);
 
   useEffect(() => {
-    if (isNational) getCentres().then(({data}) => setCentres(data||[]));
+    if (isNational || isCoordination || isSousCoord) getCentres().then(({data}) => {
+      if (isSousCoord && profile?.sous_coordination_id) {
+        setCentres((data||[]).filter(c => c.sous_coordination_id === profile.sous_coordination_id));
+      } else if (isCoordination && profile?.coordination_id) {
+        // Coordination: load their sous-coordinations to filter centres
+        getSousCoordinations(profile.coordination_id).then(({ data: scData }) => {
+          const scIds = (scData||[]).map(sc => sc.id);
+          setCentres((data||[]).filter(c => scIds.includes(c.sous_coordination_id)));
+        });
+      } else {
+        setCentres(data||[]);
+      }
+    });
     if (effectiveCentre) load(effectiveCentre);
   }, []);
 
@@ -85,7 +99,7 @@ export default function FilieresPage({ profile }) {
       {error   && <div className="alert alert-error">⚠️ {error}</div>}
 
       {/* Filtre centre — national uniquement */}
-      {isNational && (
+      {(isNational || isCoordination || isSousCoord) && (
         <div className="filter-bar">
           <label className="form-label" style={{whiteSpace:'nowrap'}}>🏛️ Centre :</label>
           <select value={selCentre} onChange={e=>setSelCentre(e.target.value)} style={{maxWidth:320}}>

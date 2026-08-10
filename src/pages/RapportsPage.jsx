@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getRapportsByCentre, createRapport, updateRapport, deleteRapport, getAgentsByCentre, getCentres } from '../lib/api';
+import { getRapportsByCentre, createRapport, updateRapport, deleteRapport, getAgentsByCentre, getCentres , getSousCoordinations } from '../lib/api';
 
 const TYPE_STYLE = {
   retard:        { badge:'badge-orange', emoji:'⏰' },
@@ -28,7 +28,9 @@ export default function RapportsPage({ profile }) {
 
   const isNational = profile?.role === 'national';
   const isCentre   = profile?.role === 'centre';
-  const canManage  = isNational || isCentre;
+  const canManage  = isNational || isCentre || profile?.role === 'coordination' || profile?.role === 'sous_coordination';
+  const isSousCoord    = profile?.role === 'sous_coordination';
+  const isCoordination = profile?.role === 'coordination';
   const effectiveCentre = isCentre ? (profile?.centre_id || null) : (selCentre || null);
 
   useEffect(() => {
@@ -139,7 +141,7 @@ export default function RapportsPage({ profile }) {
       {success && <div className="alert alert-success">✅ {success} <button onClick={()=>setSuccess('')} style={{marginLeft:8,background:'none',border:'none',cursor:'pointer'}}>✕</button></div>}
       {error   && <div className="alert alert-error">⚠️ {error} <button onClick={()=>setError('')} style={{marginLeft:8,background:'none',border:'none',cursor:'pointer'}}>✕</button></div>}
 
-      {isNational && (
+      {(isNational || isCoordination || isSousCoord) && (
         <div className="filter-bar">
           <label className="form-label" style={{whiteSpace:'nowrap'}}>🏛️ Centre :</label>
           <select value={selCentre} onChange={e => setSelCentre(e.target.value)} style={{maxWidth:320}}>

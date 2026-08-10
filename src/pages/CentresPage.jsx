@@ -37,12 +37,23 @@ export default function CentresPage({ profile }) {
   });
   const [sousCoords, setSousCoords] = useState([]);
 
-  const isNational = profile?.role === 'national';
-  const isCentre   = profile?.role === 'centre';
+  const isNational     = profile?.role === 'national';
+  const isCentre       = profile?.role === 'centre';
+  const isSousCoord    = profile?.role === 'sous_coordination';
+  const isCoordination = profile?.role === 'coordination';
+  const canCreate      = isNational || isSousCoord;
 
   useEffect(() => {
     load();
-    if (isNational) getSousCoordinations().then(({ data }) => setSousCoords(data || []));
+    if (isNational) {
+      getSousCoordinations().then(({ data }) => setSousCoords(data || []));
+    } else if (isSousCoord && profile?.sous_coordination_id) {
+      getSousCoordinations().then(({ data }) => {
+        setSousCoords((data || []).filter(sc => sc.id === profile.sous_coordination_id));
+      });
+    } else if (isCoordination && profile?.coordination_id) {
+      getSousCoordinations(profile.coordination_id).then(({ data }) => setSousCoords(data || []));
+    }
   }, []);
 
   /* ── Charger les centres ── */
@@ -56,6 +67,12 @@ export default function CentresPage({ profile }) {
     }
     if (isCentre && profile?.centre_id) {
       setCentres((data || []).filter(c => c.id === profile.centre_id));
+    } else if (isSousCoord && profile?.sous_coordination_id) {
+      setCentres((data || []).filter(c => c.sous_coordination_id === profile.sous_coordination_id));
+    } else if (isCoordination && profile?.coordination_id) {
+      // Coordination sees centres linked to their sous-coordinations
+      const scIds = sousCoords.map(sc => sc.id);
+      setCentres((data || []).filter(c => scIds.includes(c.sous_coordination_id)));
     } else {
       setCentres(data || []);
     }
@@ -73,6 +90,10 @@ export default function CentresPage({ profile }) {
   const submit = async (e) => {
     e.preventDefault();
     setError(''); setSuccess('');
+    // Auto-fill sous_coordination_id for sous-coordination role
+    if (isSousCoord && profile?.sous_coordination_id) {
+      form.sous_coordination_id = profile.sous_coordination_id;
+    }
 
     if (editing) {
       /* Modification */
@@ -206,7 +227,7 @@ export default function CentresPage({ profile }) {
           <p className="page-subtitle">{centres.length} centre(s) enregistré(s)</p>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          {isNational && (
+          {canCreate && (
             <button className="btn btn-teal" onClick={() => {
               setShowForm(true); setEditing(null); resetForm(); setError(''); setSuccess('');
             }}>
@@ -297,16 +318,29 @@ export default function CentresPage({ profile }) {
               <Field label="Téléphone" value={form.telephone} onChange={v => sf('telephone', v)} />
               <Field label="Email du Centre" value={form.email_centre} type="email" onChange={v => sf('email_centre', v)} />
               <Field label="Adresse complète" value={form.adresse} onChange={v => sf('adresse', v)} />
-              {isNational && (
+              {(isNational || isSousCoord) && (
                 <div className="form-field">
                   <label className="form-label">Sous-coordination *</label>
-                  <select value={form.sous_coordination_id} onChange={e => sf('sous_coordination_id', e.target.value)} required>
-                    <option value="">-- Choisir --</option>
-                    {sousCoords.map(sc => (
-                      <option key={sc.id} value={sc.id}>
-                        {sc.coordinations?.nom ? `${sc.coordinations.nom} — ${sc.nom}` : sc.nom}
-                      </option>
-                    ))}
+                  <select
+                    value={isSousCoord ? (profile?.sous_coordination_id || '') : form.sous_coordination_id}
+                    onChange={e => sf('sous_coordination_id', e.target.value)}
+                    required
+                    disabled={isSousCoord}
+                  >
+                    {isSousCoord ? (
+                      sousCoords.map(sc => (
+                        <option key={sc.id} value={sc.id}>{sc.nom}</option>
+                      ))
+                    ) : (
+                      <>
+                        <option value="">-- Choisir --</option>
+                        {sousCoords.map(sc => (
+                          <option key={sc.id} value={sc.id}>
+                            {sc.coordinations?.nom ? `${sc.coordinations.nom} — ${sc.nom}` : sc.nom}
+                          </option>
+                        ))}
+                      </>
+                    )}
                   </select>
                 </div>
               )}
@@ -374,7 +408,7 @@ export default function CentresPage({ profile }) {
         <div className="empty-state">
           <div className="emoji">🏛️</div>
           <h3>Aucun centre enregistré</h3>
-          {isNational && <p>Cliquez sur "+ Nouveau Centre" pour commencer.</p>}
+          {canCreate && <p>Cliquez sur "+ Nouveau Centre" pour commencer.</p>}
         </div>
       ) : filteredCentres.length === 0 ? (
         <div className="empty-state">
@@ -441,7 +475,7 @@ export default function CentresPage({ profile }) {
               </div>
 
               {/* Actions */}
-              {isNational && (
+              {(isNational || isCoordination) && (
                 <div style={{ display: 'flex', gap: 8, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
                   <button
                     className="btn btn-ghost"
